@@ -64,10 +64,31 @@ int main(int argc, char *argv[]) {
         SDL_RenderClear(renderer);
 
         // ดึง Pointer ของภาพตาม Index เฟรมปัจจุบันที่อัปเดตจาก Game_Update
-        const uint16_t *currentSprite = undying_player_walk_right[player.currentFrame];
+        const uint16_t * const *walkSprites;
+        const uint16_t *idleSprite;
+        switch (player.direction) {
+            case PLAYER_UP:
+                walkSprites = undying_player_walk_back;
+                idleSprite = undying_player_idle_back[0];
+                break;
+            case PLAYER_DOWN:
+                walkSprites = undying_player_walk_front;
+                idleSprite = undying_player_idle_front[0];
+                break;
+            case PLAYER_LEFT:
+                walkSprites = undying_player_walk_left;
+                idleSprite = undying_player_idle_left[0];
+                break;
+            default:
+                walkSprites = undying_player_walk_right;
+                idleSprite = undying_player_idle_right[0];
+                break;
+        }
+        const uint16_t *currentSprite = player.isMoving
+            ? walkSprites[player.currentFrame] : idleSprite;
 
         // วาดตัวละครด้วยภาพเฟรมปัจจุบัน
-        Draw_Sprite_Simulated(renderer, player.x, player.y, 16, 16, currentSprite, player.facingLeft);
+        Draw_Sprite_Simulated(renderer, player.x, player.y, 16, 16, currentSprite, false);
 
         SDL_RenderPresent(renderer);
         SDL_Delay(16);

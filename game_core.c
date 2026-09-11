@@ -6,54 +6,56 @@ void Game_Init(Player *player) {
     player->y = 100.0f;
     player->speed = 120.0f;
     player->facingLeft = false;
+    player->direction = PLAYER_RIGHT;
     
     player->currentFrame = 0;
     player->animTimer = 0.0f;
     player->isMoving = false;
+    player->isMovingRight = false;
+    player->isMovingLeft = false;
+    player->isMovingUp = false;
+    player->isMovingDown = false;
 }
 
 void Game_Update(Player *player, const bool *keyboardState, float deltaTime) {
     if (keyboardState == NULL) return;
 
-    float moveAmount = player->speed * deltaTime;
-    player->isMoving = false;
+    int dx = (keyboardState[SDL_SCANCODE_D] || keyboardState[SDL_SCANCODE_RIGHT])
+           - (keyboardState[SDL_SCANCODE_A] || keyboardState[SDL_SCANCODE_LEFT]);
+    int dy = (keyboardState[SDL_SCANCODE_S] || keyboardState[SDL_SCANCODE_DOWN])
+           - (keyboardState[SDL_SCANCODE_W] || keyboardState[SDL_SCANCODE_UP]);
+    PlayerDirection previousDirection = player->direction;
 
-    // ตรวจสอบการกดปุ่ม
-    if (keyboardState[SDL_SCANCODE_W] || keyboardState[SDL_SCANCODE_UP]) {
-        player->y -= moveAmount;
-        player->isMoving = true;
-    }
-    if (keyboardState[SDL_SCANCODE_S] || keyboardState[SDL_SCANCODE_DOWN]) {
-        player->y += moveAmount;
-        player->isMoving = true;
-    }
-    if (keyboardState[SDL_SCANCODE_A] || keyboardState[SDL_SCANCODE_LEFT]) {
-        player->x -= moveAmount;
-        player->facingLeft = true;
-        player->isMoving = true;
-    }
-    if (keyboardState[SDL_SCANCODE_D] || keyboardState[SDL_SCANCODE_RIGHT]) {
-        player->x += moveAmount;
-        player->facingLeft = false;
-        player->isMoving = true;
-    }
+    player->isMovingRight = dx > 0;
+    player->isMovingLeft = dx < 0;
+    player->isMovingUp = dy < 0;
+    player->isMovingDown = dy > 0;
+    player->isMoving = dx != 0 || dy != 0;
+    player->x += dx * player->speed * deltaTime;
+    player->y += dy * player->speed * deltaTime;
 
-    // คำนวณอนิเมชั่นเมื่อมีการเคลื่อนที่
-    // คำนวณอนิเมชั่นเมื่อมีการเคลื่อนที่
-if (player->isMoving) {
-    player->animTimer += deltaTime;
-    
-    // ปรับเปลี่ยนความเร็วอนิเมชั่นตรงนี้:ฅ
-    // 0.1f  = 10 FPS (เร็ว)
-    // 0.2f  = 5  FPS (กำลังดี/ช้าลงเท่าตัว)
-    // 0.25f = 4  FPS (ช้าละเมียด)
-    if (player->animTimer >= 0.25f) { 
+    // Vertical movement takes priority for diagonal walking. Up shows the back.
+    if (dy < 0) player->direction = PLAYER_UP;
+    else if (dy > 0) player->direction = PLAYER_DOWN;
+    else if (dx < 0) player->direction = PLAYER_LEFT;
+    else if (dx > 0) player->direction = PLAYER_RIGHT;
+    player->facingLeft = player->direction == PLAYER_LEFT;
+
+    if (player->direction != previousDirection) {
+        player->currentFrame = 0;
         player->animTimer = 0.0f;
-        player->currentFrame = (player->currentFrame + 1) % 4; // วนลูป 0 -> 1 -> 2 -> 3
     }
-} else {
-    // เมื่อหยุดเดิน ให้กลับไปยืนท่าปกติ (เฟรม 0)
-    player->currentFrame = 0;
-    player->animTimer = 0.0f;
-}
+
+    if (player->isMoving) {
+        player->animTimer += deltaTime;
+        // Keep the existing walking speed of four animation frames per second.
+        while (player->animTimer >= 0.25f) {
+            player->animTimer -= 0.25f;
+            player->currentFrame = (player->currentFrame + 1) % 4;
+        }
+    } else {
+        // Keep the last facing direction when standing still.
+        player->currentFrame = 0;
+        player->animTimer = 0.0f;
+    }
 }
