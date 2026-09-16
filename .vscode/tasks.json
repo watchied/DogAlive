@@ -7,10 +7,11 @@
       "command": "C:/mingw64/bin/gcc.exe",
       "args": [
         "-g",
-        "main.c",
-        "game_core.c",
+        "src/main.c",
+        "src/core/game_core.c",
         "-o",
-        "game.exe",
+        "bin/game.exe",
+        "-I.",
         "-Iinclude",
         "-Llib",
         "-lmingw32",
@@ -19,6 +20,9 @@
       "group": {
         "kind": "build",
         "isDefault": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
       }
     }
   ]

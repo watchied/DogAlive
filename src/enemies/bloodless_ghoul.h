@@ -5,8 +5,8 @@
 #define GHOUL_ATTACK_WINDUP 0.4f // Extra pause before the slash animation
 #include <math.h>
 #include <stdbool.h>
-#include "player.h"
-#include "bloodless_ghoul_sprites.h"
+#include "src/player/player.h"
+#include "assets/sprites/enemies/bloodless_ghoul_sprites.h"
 #include <SDL3/SDL.h>
 typedef enum
 {
@@ -37,10 +37,10 @@ static inline void Ghoul_Init(Ghoul *g, float x, float y)
     *g = (Ghoul){
         .x = x,
         .y = y,
-        .speed = 65.0f,
+        .speed = 70.0f / 3.0f,
         .direction = PLAYER_LEFT,
         .state = GHOUL_WALK,
-        .attackDamage = 10,
+        .attackDamage = 20,
         .hp = GHOUL_MAX_HP,
         .maxHP = GHOUL_MAX_HP,
 
@@ -53,16 +53,16 @@ static inline SDL_FRect Ghoul_AttackBox(const Ghoul *g)
     switch (g->direction)
     {
     case PLAYER_UP:
-        return (SDL_FRect){g->x, g->y - 32, 48, 32};
+        return (SDL_FRect){g->x, g->y - MELEE_REACH, ACTOR_SIZE, MELEE_REACH};
 
     case PLAYER_DOWN:
-        return (SDL_FRect){g->x, g->y + 48, 48, 32};
+        return (SDL_FRect){g->x, g->y + ACTOR_SIZE, ACTOR_SIZE, MELEE_REACH};
 
     case PLAYER_LEFT:
-        return (SDL_FRect){g->x - 32, g->y, 32, 48};
+        return (SDL_FRect){g->x - MELEE_REACH, g->y, MELEE_REACH, ACTOR_SIZE};
 
     default:
-        return (SDL_FRect){g->x + 48, g->y, 32, 48};
+        return (SDL_FRect){g->x + ACTOR_SIZE, g->y, MELEE_REACH, ACTOR_SIZE};
     }
 }
 
@@ -78,16 +78,33 @@ static inline SDL_FRect Player_AttackBox(const Player *p)
     switch (p->direction)
     {
     case PLAYER_UP:
-        return (SDL_FRect){p->x, p->y - 32, 48, 32};
+        return (SDL_FRect){p->x, p->y - MELEE_REACH, ACTOR_SIZE, MELEE_REACH};
 
     case PLAYER_DOWN:
-        return (SDL_FRect){p->x, p->y + 48, 48, 32};
+        return (SDL_FRect){p->x, p->y + ACTOR_SIZE, ACTOR_SIZE, MELEE_REACH};
 
     case PLAYER_LEFT:
-        return (SDL_FRect){p->x - 32, p->y, 32, 48};
+        return (SDL_FRect){p->x - MELEE_REACH, p->y, MELEE_REACH, ACTOR_SIZE};
 
     default:
-        return (SDL_FRect){p->x + 48, p->y, 32, 48};
+        return (SDL_FRect){p->x + ACTOR_SIZE, p->y, MELEE_REACH, ACTOR_SIZE};
+    }
+}
+
+static inline void Ghoul_TakeDamage(Ghoul *g, int damage, float pushX, float pushY)
+{
+    if (g->hp <= 0 || damage <= 0)
+        return;
+    g->hp -= damage;
+    g->hitFlashTimer = 0.08f;
+    g->x += pushX;
+    g->y += pushY;
+    g->state = GHOUL_REST;
+    g->timer = 0.0f;
+    g->frame = 0;
+    if (g->hp <= 0) {
+        g->hp = 0;
+        g->state = GHOUL_DEAD;
     }
 }
 
@@ -105,46 +122,21 @@ static inline void Ghoul_CheckPlayerAttack(Ghoul *g, Player *p)
     // แม้ตีพลาด ก็ถือว่าใช้จังหวะทำดาเมจของท่านี้แล้ว
     p->attackHasHit = true;
 
-    SDL_FRect ghoulBody = {g->x, g->y, 48, 48};
+    SDL_FRect ghoulBody = {g->x, g->y, ACTOR_SIZE, ACTOR_SIZE};
 
     if (!Ghoul_Overlaps(Player_AttackBox(p), ghoulBody))
         return;
 
-    g->hp -= p->attackDamage;
-    g->hitFlashTimer = 0.08f;
-    float knockback = 18.0f;
-
-    switch (p->direction)
-    {
-    case PLAYER_UP:
-        g->y -= knockback;
-        break;
-
-    case PLAYER_DOWN:
-        g->y += knockback;
-        break;
-
-    case PLAYER_LEFT:
-        g->x -= knockback;
-        break;
-
-    case PLAYER_RIGHT:
-        g->x += knockback;
-        break;
+    float pushX = 0.0f, pushY = 0.0f;
+    switch (p->direction) {
+        case PLAYER_UP: pushY = -6.0f; break;
+        case PLAYER_DOWN: pushY = 6.0f; break;
+        case PLAYER_LEFT: pushX = -6.0f; break;
+        case PLAYER_RIGHT: pushX = 6.0f; break;
     }
-
-    // ขัดจังหวะการโจมตี และให้ศัตรูชะงัก
-    g->state = GHOUL_REST;
-    g->timer = 0.0f;
-    g->frame = 0;
-    if (g->hp <= 0)
-    {
-        g->hp = 0;
-        g->state = GHOUL_DEAD;
-        g->frame = 0;
-        g->timer = 0.0f;
-    }
+    Ghoul_TakeDamage(g, p->attackDamage, pushX, pushY);
 }
+
 static inline void Ghoul_Update(
     Ghoul *g,
     Player *player,
@@ -180,8 +172,8 @@ static inline void Ghoul_Update(
         return;
     }
 
-    // ผู้เล่นและ Ghoul แสดงผลขนาด 48×48
-    SDL_FRect playerBox = {player->x, player->y, 48, 48};
+    // ผู้เล่นและ Ghoul แสดงผลขนาด 16×16
+    SDL_FRect playerBox = {player->x, player->y, ACTOR_SIZE, ACTOR_SIZE};
     if (g->hp <= 0)
         return;
     if (player->hp <= 0)
@@ -213,11 +205,27 @@ static inline void Ghoul_Update(
         {
             g->hasHit = true;
 
-            SDL_FRect bodyBox = {g->x, g->y, 48, 48};
-            if (Ghoul_Overlaps(Ghoul_AttackBox(g), playerBox) ||
-                Ghoul_Overlaps(bodyBox, playerBox))
+            SDL_FRect bodyBox = {g->x, g->y, ACTOR_SIZE, ACTOR_SIZE};
+            if (player->invincibilityTimer <= 0 &&
+                (Ghoul_Overlaps(Ghoul_AttackBox(g), playerBox) ||
+                 Ghoul_Overlaps(bodyBox, playerBox)))
             {
+                player->invincibilityTimer = PLAYER_INVINCIBILITY_TIME;
                 player->hp -= g->attackDamage;
+                player->hitFlashTimer = PLAYER_HIT_FLASH_TIME;
+                player->collisionGraceTimer = PLAYER_COLLISION_GRACE_TIME;
+                float pushX = player->x - g->x;
+                float pushY = player->y - g->y;
+                float pushLength = sqrtf(pushX * pushX + pushY * pushY);
+                if (pushLength > 0.001f) {
+                    pushX /= pushLength;
+                    pushY /= pushLength;
+                } else {
+                    pushX = (g->direction == PLAYER_RIGHT) - (g->direction == PLAYER_LEFT);
+                    pushY = (g->direction == PLAYER_DOWN) - (g->direction == PLAYER_UP);
+                }
+                player->x += pushX * PLAYER_HIT_KNOCKBACK;
+                player->y += pushY * PLAYER_HIT_KNOCKBACK;
 
                 if (player->hp < 0)
                     player->hp = 0;
@@ -262,7 +270,7 @@ static inline void Ghoul_Update(
         g->direction = dy < 0 ? PLAYER_UP : PLAYER_DOWN;
     }
 
-    SDL_FRect bodyBox = {g->x, g->y, 48, 48};
+    SDL_FRect bodyBox = {g->x, g->y, ACTOR_SIZE, ACTOR_SIZE};
 
     if (Ghoul_Overlaps(Ghoul_AttackBox(g), playerBox) ||
         Ghoul_Overlaps(bodyBox, playerBox))
@@ -293,6 +301,23 @@ static inline void Ghoul_Update(
         g->frame = (g->frame + 1) %
                    BLOODLESS_GHOUL_MELEE_ENEMY_WALK_COUNT;
     }
+}
+
+// Separate living bodies along the smallest overlap. Damage/grace is handled first.
+static inline void Ghoul_ResolvePlayerCollision(const Ghoul *g, Player *p)
+{
+    if (g->hp <= 0 || p->hp <= 0 || p->collisionGraceTimer > 0.0f)
+        return;
+    float dx = p->x - g->x;
+    float dy = p->y - g->y;
+    float overlapX = ACTOR_SIZE - fabsf(dx);
+    float overlapY = ACTOR_SIZE - fabsf(dy);
+    if (overlapX <= 0.0f || overlapY <= 0.0f)
+        return;
+    if (overlapX < overlapY)
+        p->x += dx < 0.0f ? -overlapX : overlapX;
+    else
+        p->y += dy < 0.0f ? -overlapY : overlapY;
 }
 
 static inline const uint16_t *Ghoul_GetSprite(const Ghoul *g)
