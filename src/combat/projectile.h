@@ -13,7 +13,21 @@ typedef struct {
     float lifetime;
     int damage;
     bool active;
+    ArrowType type;
 } Projectile;
+
+static inline void Projectiles_Recharge(Player *p, float dt)
+{
+    if (p->hp <= 0) return;
+    if (p->bowCharges >= PLAYER_BOW_MAX_CHARGES) { p->shootTimer = 0; return; }
+    if (p->shootCooldown <= 0) { p->bowCharges = PLAYER_BOW_MAX_CHARGES; p->shootTimer = 0; return; }
+    p->shootTimer -= dt;
+    while (p->shootTimer <= 0 && p->bowCharges < PLAYER_BOW_MAX_CHARGES) {
+        ++p->bowCharges;
+        if (p->bowCharges < PLAYER_BOW_MAX_CHARGES) p->shootTimer += p->shootCooldown;
+        else p->shootTimer = 0;
+    }
+}
 
 static inline void Projectiles_Reset(Projectile *shots)
 {
@@ -23,7 +37,7 @@ static inline void Projectiles_Reset(Projectile *shots)
 // Start the bow animation; the arrow is created only on the middle frame.
 static inline bool Projectiles_Shoot(Projectile *shots, Player *p)
 {
-    if (p->hp <= 0 || p->isAttacking || p->isShooting || p->shootTimer > 0.0f)
+    if (p->hp <= 0 || p->isAttacking || p->isShooting || p->bowCharges < Arrow_ChargeCost(p->arrowType))
         return false;
     float dx = p->aimX, dy = p->aimY;
     float length = sqrtf(dx * dx + dy * dy);
@@ -45,7 +59,9 @@ static inline bool Projectiles_Shoot(Projectile *shots, Player *p)
     p->arrowReleased = false;
     p->currentFrame = 0;
     p->animTimer = 0.0f;
-    p->shootTimer = p->shootCooldown;
+    if (p->bowCharges == PLAYER_BOW_MAX_CHARGES) p->shootTimer = p->shootCooldown;
+    p->shootingArrowType = p->arrowType;
+    p->bowCharges -= Arrow_ChargeCost(p->arrowType);
     p->isMoving = false;
     p->isMovingLeft = p->isMovingRight = false;
     p->isMovingUp = p->isMovingDown = false;
@@ -69,7 +85,7 @@ static inline void Projectiles_UpdateShooting(Projectile *shots, Player *p, floa
                     .vx = p->aimX * p->arrowSpeed,
                     .vy = p->aimY * p->arrowSpeed,
                     .lifetime = p->arrowLifetime,
-                    .damage = p->arrowDamage, .active = true
+                    .damage = p->arrowDamage, .active = true, .type = p->shootingArrowType
                 };
                 break;
             }

@@ -11,6 +11,7 @@
 #include "assets/sprites/ui/bow_charge.h"
 #include "assets/sprites/ui/bow_bar.h"
 #include "assets/sprites/ui/heart.h"
+#include "assets/sprites/ui/crossbow_icon.h"
 
 #define STAMINA_UI_WIDTH 80
 #define BOW_UI_WIDTH 28
@@ -112,8 +113,17 @@ static inline void HUD_Draw(SDL_Renderer *renderer, const Player *p)
         stamina_bar_frames, STAMINA_BAR_WIDTH, STAMINA_BAR_HEIGHT,
         stamina_frames, STAMINA_WIDTH, STAMINA_HEIGHT, 0, 2);
     float ready = p->shootCooldown > 0 ? 1 - p->shootTimer / p->shootCooldown : 1;
-    HUD_DrawArtBar(renderer, hp.x, stamina.y + stamina.h + 2, BOW_UI_WIDTH, ready,
+    float bowY = stamina.y + stamina.h + 4;
+    for (int i = 0; i < PLAYER_BOW_MAX_CHARGES; ++i)
+        HUD_DrawArtBar(renderer, hp.x + i * (BOW_UI_WIDTH + 2), bowY, BOW_UI_WIDTH,
+        i < p->bowCharges ? 1 : i == p->bowCharges ? ready : 0,
         bow_bar_frames, BOW_BAR_WIDTH, BOW_BAR_HEIGHT,
         bow_charge_frames, BOW_CHARGE_WIDTH, BOW_CHARGE_HEIGHT, 1, 0);
+    const uint16_t *icon = p->arrowType == ARROW_FIRE ? crossbow_icon_fire_crossbow[0] :
+        p->arrowType == ARROW_EXPLOSIVE ? crossbow_icon_bomb_crossbow[0] : crossbow_icon_crossbow[0];
+    for (int y = 0; y < CROSSBOW_ICON_HEIGHT; ++y)
+        for (int x = 0; x < CROSSBOW_ICON_WIDTH; ++x)
+            HUD_DrawPixel(renderer, hp.x - CROSSBOW_ICON_WIDTH - 2 + x, bowY - 2 + y,
+                icon[y * CROSSBOW_ICON_WIDTH + x]);
 }
 #endif

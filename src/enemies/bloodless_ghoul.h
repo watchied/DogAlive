@@ -2,7 +2,7 @@
 #define GHOUL_H
 #define GHOUL_MAX_HP 100
 #define GHOUL_ATTACK_HIT_FRAME 4 // Final slash pose (zero-based)
-#define GHOUL_ATTACK_WINDUP 0.4f // Extra pause before the slash animation
+#define GHOUL_ATTACK_WINDUP 0.35f // Extra pause before the slash animation
 #include <math.h>
 #include <stdbool.h>
 #include "src/player/player.h"

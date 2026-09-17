@@ -21,7 +21,7 @@ int main(void)
     assert(!shots[0].active); // The longer preparation must not release an early shot.
     for (int i = 0; i < 20; ++i) FleshSlime_Update(&f, &p, shots, 0.05f);
     assert(f.x < 250 && shots[0].active && shots[0].vx < 0);
-    assert(fabsf(sqrtf(shots[0].vx * shots[0].vx + shots[0].vy * shots[0].vy) - 65.0f) < 0.01f);
+    assert(fabsf(sqrtf(shots[0].vx * shots[0].vx + shots[0].vy * shots[0].vy) - SLIME_PROJECTILE_SPEED) < 0.01f);
     for (int i = 0; i < 100; ++i) SlimeShots_Update(shots, &p, 0.05f);
     assert(p.hp == 80 && !shots[0].active);
 

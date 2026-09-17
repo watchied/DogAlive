@@ -21,11 +21,17 @@
 #define PLAYER_ATTACK_DAMAGE 25
 #define PLAYER_ARROW_DAMAGE 15
 #define PLAYER_ARROW_SPEED 200.0f
-#define PLAYER_SHOOT_COOLDOWN 2.0f
+#define PLAYER_SHOOT_COOLDOWN 2.5f
+#define PLAYER_BOW_MAX_CHARGES 3
+#define FIRE_ARROW_BURN_MULTIPLIER 1.5f
+#define FIRE_ARROW_TICKS 6
+#define FIRE_ARROW_TICK_TIME 0.5f
+#define EXPLOSIVE_ARROW_MULTIPLIER 1.75f
+#define EXPLOSIVE_ARROW_RADIUS 24.0f
 #define PLAYER_ARROW_LIFETIME 1.5f
 #define PLAYER_SHOOT_FRAME_COUNT 5
 #define PLAYER_SHOOT_RELEASE_FRAME (PLAYER_SHOOT_FRAME_COUNT / 2)
-#define PLAYER_SHOOT_FRAME_TIME 0.1f
+#define PLAYER_SHOOT_FRAME_TIME 0.05f
 #define PLAYER_ATTACK_HIT_FRAME 4
 
 typedef enum
@@ -35,6 +41,9 @@ typedef enum
     PLAYER_LEFT,
     PLAYER_RIGHT
 } PlayerDirection;
+
+typedef enum { ARROW_NORMAL, ARROW_FIRE, ARROW_EXPLOSIVE } ArrowType;
+static inline int Arrow_ChargeCost(ArrowType type) { return (int)type + 1; }
 
 typedef struct
 {
@@ -62,6 +71,9 @@ typedef struct
     float shootCooldown;
     float arrowLifetime;
     float shootTimer;
+    int bowCharges;
+    ArrowType arrowType;
+    ArrowType shootingArrowType; // Snapshot so switching cannot change an already paid shot.
     bool isShooting;
     bool arrowReleased;
     float aimX, aimY;
@@ -96,6 +108,7 @@ static inline void Player_Init(Player *player)
         .arrowDamage = PLAYER_ARROW_DAMAGE,
         .arrowSpeed = PLAYER_ARROW_SPEED,
         .shootCooldown = PLAYER_SHOOT_COOLDOWN,
+        .bowCharges = PLAYER_BOW_MAX_CHARGES,
         .arrowLifetime = PLAYER_ARROW_LIFETIME,
         .aimX = 1.0f,
         .aimY = 0.0f,
