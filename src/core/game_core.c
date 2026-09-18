@@ -89,9 +89,9 @@ void Game_Update(Player *player, const bool *keyboardState, float deltaTime)
         player->animTimer += deltaTime;
 
         // ท่าตีมี 5 เฟรม ใช้เวลาเฟรมละ 0.1 วินาที
-        while (player->animTimer >= 0.1f)
+        while (player->animTimer >= MELEE_ACTOR_FRAME_TIME)
         {
-            player->animTimer -= 0.1f;
+            player->animTimer -= MELEE_ACTOR_FRAME_TIME;
             player->currentFrame++;
 
             if (player->currentFrame >= 5)

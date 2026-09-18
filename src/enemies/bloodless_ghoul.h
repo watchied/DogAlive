@@ -1,7 +1,7 @@
 #ifndef GHOUL_H
 #define GHOUL_H
 #define GHOUL_MAX_HP 100
-#define GHOUL_ATTACK_HIT_FRAME 4 // Final slash pose (zero-based)
+#define GHOUL_ATTACK_HIT_FRAME MELEE_HIT_FRAME // Final actor pose, synchronized with effect frame 3.
 #define GHOUL_ATTACK_WINDUP 0.35f // Extra pause before the slash animation
 #include <math.h>
 #include <stdbool.h>
@@ -73,24 +73,6 @@ static inline bool Ghoul_Overlaps(SDL_FRect a, SDL_FRect b)
            a.y < b.y + b.h &&
            a.y + a.h > b.y;
 }
-static inline SDL_FRect Player_AttackBox(const Player *p)
-{
-    switch (p->direction)
-    {
-    case PLAYER_UP:
-        return (SDL_FRect){p->x, p->y - MELEE_REACH, ACTOR_SIZE, MELEE_REACH};
-
-    case PLAYER_DOWN:
-        return (SDL_FRect){p->x, p->y + ACTOR_SIZE, ACTOR_SIZE, MELEE_REACH};
-
-    case PLAYER_LEFT:
-        return (SDL_FRect){p->x - MELEE_REACH, p->y, MELEE_REACH, ACTOR_SIZE};
-
-    default:
-        return (SDL_FRect){p->x + ACTOR_SIZE, p->y, MELEE_REACH, ACTOR_SIZE};
-    }
-}
-
 static inline void Ghoul_TakeDamage(Ghoul *g, int damage, float pushX, float pushY)
 {
     if (g->hp <= 0 || damage <= 0)

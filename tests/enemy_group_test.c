@@ -52,7 +52,7 @@ int main(void)
     FleshSlime_Init(&g.slimes[0], 0, 0);
     EyeParasite_Init(&g.eyes[0], 0, 0);
     for (int i = 0; i < 60; ++i) EnemyGroup_Separate(&g, 0.016f);
-    EnemyTarget bodies[ENEMY_TYPE_CAPACITY * 3];
+    EnemyTarget bodies[ENEMY_TARGET_CAPACITY];
     int count = EnemyGroup_Targets(&g, bodies);
     for (int i = 0; i < count; ++i) {
         assert(bodies[i].body.x >= 0 && bodies[i].body.y >= 0);

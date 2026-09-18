@@ -13,6 +13,8 @@
 #include "src/ui/health_ui.h"
 #include "src/core/stages.h"
 #include "src/player/bow_input.h"
+#include "src/effects/melee_slash.h"
+#include "src/ui/slime_king_draw.h"
 
 typedef enum {
     GAME_MENU,      // หน้าก่อนเริ่มเกม
@@ -155,7 +157,7 @@ static void Draw_ArrowEffects(SDL_Renderer *renderer, EnemyGroup *g)
         }
     }
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-    EnemyTarget targets[ENEMY_TYPE_CAPACITY * 3];
+    EnemyTarget targets[ENEMY_TARGET_CAPACITY];
     int n = EnemyGroup_Targets(g, targets);
     for (int i = 0; i < n; ++i) {
         EnemyTarget t = targets[i];
@@ -487,6 +489,10 @@ int main(void)
                         false, s->hitFlashTimer > 0, false, false);
             }
             Draw_Projectiles(renderer, arrowTexture, projectiles);
+            King_Draw(renderer, &enemies.king);
+            MeleeSlash_Player(renderer, &player);
+            for (int i = 0; i < enemies.ghoulCount; ++i)
+                MeleeSlash_Ghoul(renderer, &enemies.ghouls[i]);
             Draw_ArrowEffects(renderer, &enemies);
 
             HUD_Draw(renderer, &player);

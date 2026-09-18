@@ -14,19 +14,19 @@ int main(void)
         assert(shots[i].active && shots[i].type == ARROW_NORMAL);
     }
     assert(p.bowCharges == 0 && !Projectiles_Shoot(shots, &p));
-    Projectiles_Recharge(&p, 1.0f);
+    Projectiles_Recharge(&p, p.shootCooldown / 2);
     assert(p.bowCharges == 0);
-    Projectiles_Recharge(&p, 1.0f);
+    Projectiles_Recharge(&p, p.shootCooldown / 2);
     assert(p.bowCharges == 1);
     p.arrowType = ARROW_FIRE;
     assert(!Projectiles_Shoot(shots, &p));
-    Projectiles_Recharge(&p, 4.0f);
+    Projectiles_Recharge(&p, p.shootCooldown * 2);
     assert(p.bowCharges == 3 && p.shootTimer == 0);
     assert(Projectiles_Shoot(shots, &p) && p.bowCharges == 1);
     p.arrowType = ARROW_EXPLOSIVE;
     Projectiles_UpdateShooting(shots, &p, 0.3f);
     assert(shots[3].type == ARROW_FIRE);
-    Projectiles_Recharge(&p, 4.0f);
+    Projectiles_Recharge(&p, p.shootCooldown * 2);
     assert(Projectiles_Shoot(shots, &p) && p.bowCharges == 0);
     Projectiles_UpdateShooting(shots, &p, 0.3f);
     assert(shots[4].type == ARROW_EXPLOSIVE);

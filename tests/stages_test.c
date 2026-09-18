@@ -23,6 +23,7 @@ int main(void)
         for (int i = 0; i < enemies.ghoulCount; ++i) enemies.ghouls[i].hp = 0;
         for (int i = 0; i < enemies.slimeCount; ++i) enemies.slimes[i].hp = 0;
         for (int i = 0; i < enemies.eyeCount; ++i) enemies.eyes[i].hp = 0;
+        if (enemies.king.active) { enemies.king.hp = 0; enemies.king.state = KING_NPC; }
         assert(Stage_EnemiesAlive(&enemies) == 0);
         p.x = 24; p.y = 100;
         Stage_Update(&stage, &p, &enemies, arrows, shots, &effect);
@@ -44,6 +45,7 @@ int main(void)
     stage = (StageProgress){0};
     Stage_Load(0, &p, &enemies, arrows, shots, &effect);
     for (int i = 0; i < enemies.ghoulCount; ++i) enemies.ghouls[i].hp = 0;
+    if (enemies.king.active) { enemies.king.hp = 0; enemies.king.state = KING_NPC; }
     SDL_FRect door = Stage_ExitBox(0);
     p.x = door.x; p.y = door.y;
     Stage_Update(&stage, &p, &enemies, arrows, shots, &effect);

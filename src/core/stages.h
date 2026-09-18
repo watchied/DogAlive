@@ -7,16 +7,17 @@
 #define STAGE_COUNT 5
 #define STAGE_WALL_SIZE 4.0f
 typedef enum { STAGE_RIGHT, STAGE_LEFT, STAGE_TOP, STAGE_BOTTOM } StageSide;
-typedef struct { int ghouls, slimes, eyes; StageSide nextSide; } StageDefinition;
-// {ghouls, slimes, eyes, next exit side}. Choose STAGE_TOP/BOTTOM/LEFT/RIGHT.
+typedef struct { int ghouls, slimes, eyes; StageSide nextSide; bool slimeKing; } StageDefinition;
+// {ghouls, slimes, eyes, next exit side, enable Slime King}.
+// Choose STAGE_TOP/BOTTOM/LEFT/RIGHT for the exit side.
 // The next room's return door is automatically on the opposite side.
 // If both doors share a wall, they are separated at 30% and 70% of that wall.
 static const StageDefinition stageDefinitions[STAGE_COUNT] = {
-    {2, 0, 0, STAGE_RIGHT},
-    {2, 1, 0, STAGE_TOP},
-    {3, 1, 1, STAGE_RIGHT},
-    {3, 2, 2, STAGE_BOTTOM},
-    {4, 3, 2, STAGE_RIGHT}
+    {0, 0, 0, STAGE_RIGHT, true},
+    {2, 1, 0, STAGE_TOP, false},
+    {3, 1, 1, STAGE_RIGHT, false},
+    {3, 2, 2, STAGE_BOTTOM, false},
+    {4, 3, 2, STAGE_RIGHT, false}
 };
 typedef struct {
     int index;
@@ -32,6 +33,7 @@ static inline int Stage_EnemiesAlive(const EnemyGroup *g)
     for (int i = 0; i < g->ghoulCount; ++i) count += g->ghouls[i].hp > 0;
     for (int i = 0; i < g->slimeCount; ++i) count += g->slimes[i].hp > 0;
     for (int i = 0; i < g->eyeCount; ++i) count += g->eyes[i].hp > 0;
+    if (g->king.active && g->king.state != KING_NPC) ++count;
     return count;
 }
 static inline StageSide Stage_Opposite(StageSide side)
@@ -83,6 +85,10 @@ static inline void Stage_Load(int index, Player *p, EnemyGroup *enemies,
 {
     StageDefinition d = stageDefinitions[index];
     EnemyGroup_InitCounts(enemies, d.ghouls, d.slimes, d.eyes);
+    if (d.slimeKing) {
+        King_Init(&enemies->king, 220, 100);
+        enemies->king.rng ^= (uint32_t)SDL_GetPerformanceCounter();
+    }
     Projectiles_Reset(arrows);
     memset(shots, 0, sizeof(SlimeShot) * SLIME_SHOT_CAPACITY);
     *effect = (RunningEffect){0};

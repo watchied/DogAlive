@@ -2,7 +2,9 @@
 #define PLAYER_H
 
 #include <stdbool.h>
+#include <SDL3/SDL.h>
 #include "src/core/game_config.h"
+#include "src/effects/melee_timing.h"
 
 #define PLAYER_START_X 100.0f
 #define PLAYER_START_Y 100.0f
@@ -15,6 +17,7 @@
 #define PLAYER_MAX_STAMINA 100
 #define PLAYER_SPRINT_MULTIPLIER 1.7f
 #define PLAYER_STAMINA_DRAIN 25.0f
+#define PLAYER_MELEE_REACH 12.0f // Melee reach in world pixels; affects attacks and slime parries.
 #define PLAYER_STAMINA_REGEN 20.0f
 #define PLAYER_SPRINT_MIN_STAMINA 20.0f
 #define PLAYER_DOUBLE_TAP_TIME 0.25f
@@ -32,7 +35,7 @@
 #define PLAYER_SHOOT_FRAME_COUNT 5
 #define PLAYER_SHOOT_RELEASE_FRAME (PLAYER_SHOOT_FRAME_COUNT / 2)
 #define PLAYER_SHOOT_FRAME_TIME 0.05f
-#define PLAYER_ATTACK_HIT_FRAME 4
+#define PLAYER_ATTACK_HIT_FRAME MELEE_HIT_FRAME
 
 typedef enum
 {
@@ -93,6 +96,22 @@ typedef struct
     bool attackWasDown;
     bool attackHasHit;
 } Player;
+
+// Player melee hitbox extends from the front edge of the body.
+static inline SDL_FRect Player_AttackBox(const Player *p)
+{
+    switch (p->direction)
+    {
+    case PLAYER_UP:
+        return (SDL_FRect){p->x, p->y - PLAYER_MELEE_REACH, ACTOR_SIZE, PLAYER_MELEE_REACH};
+    case PLAYER_DOWN:
+        return (SDL_FRect){p->x, p->y + ACTOR_SIZE, ACTOR_SIZE, PLAYER_MELEE_REACH};
+    case PLAYER_LEFT:
+        return (SDL_FRect){p->x - PLAYER_MELEE_REACH, p->y, PLAYER_MELEE_REACH, ACTOR_SIZE};
+    default:
+        return (SDL_FRect){p->x + ACTOR_SIZE, p->y, PLAYER_MELEE_REACH, ACTOR_SIZE};
+    }
+}
 
 static inline void Player_Init(Player *player)
 {

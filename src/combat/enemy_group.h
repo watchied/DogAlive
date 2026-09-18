@@ -1,6 +1,8 @@
 #ifndef ENEMY_GROUP_H
 #define ENEMY_GROUP_H
 #include "src/combat/enemy_combat.h"
+#include "src/enemies/slime_king.h"
+#define ENEMY_TARGET_CAPACITY (ENEMY_TYPE_CAPACITY * 3 + 1)
 
 typedef struct { int damageLeft, ticksLeft; float timer; } EnemyBurn;
 typedef struct { float x, y, timer; } ArrowExplosion;
@@ -9,8 +11,9 @@ typedef struct {
     FleshSlime slimes[ENEMY_TYPE_CAPACITY];
     EyeParasite eyes[ENEMY_TYPE_CAPACITY];
     int ghoulCount, slimeCount, eyeCount;
-    EnemyBurn burns[3][ENEMY_TYPE_CAPACITY];
+    EnemyBurn burns[4][ENEMY_TYPE_CAPACITY];
     ArrowExplosion explosions[MAX_PROJECTILES];
+    SlimeKing king;
 } EnemyGroup;
 
 static inline void EnemyGroup_InitCounts(EnemyGroup *group, int ghouls, int slimes, int eyes)
@@ -43,6 +46,8 @@ static inline int EnemyGroup_Targets(EnemyGroup *g, EnemyTarget *targets)
         targets[n++] = (EnemyTarget){{g->slimes[i].x, g->slimes[i].y, ACTOR_SIZE, ACTOR_SIZE}, g->slimes[i].hp, 1, i};
     for (int i = 0; i < g->eyeCount; ++i)
         targets[n++] = (EnemyTarget){{g->eyes[i].x, g->eyes[i].y, ACTOR_SIZE, ACTOR_SIZE}, g->eyes[i].hp, 2, i};
+    if (g->king.active)
+        targets[n++] = (EnemyTarget){King_Body(&g->king), King_Targetable(&g->king) ? g->king.hp : 0, 3, 0};
     return n;
 }
 static inline void EnemyGroup_Damage(EnemyGroup *g, EnemyTarget t, int damage, float px, float py)
@@ -50,13 +55,14 @@ static inline void EnemyGroup_Damage(EnemyGroup *g, EnemyTarget t, int damage, f
     if (t.type == 0) Ghoul_TakeDamage(&g->ghouls[t.index], damage, px, py);
     if (t.type == 1) FleshSlime_TakeDamage(&g->slimes[t.index], damage, px, py);
     if (t.type == 2) EyeParasite_TakeDamage(&g->eyes[t.index], damage, px, py);
+    if (t.type == 3) King_TakeDamage(&g->king, damage, true);
 }
 static inline void EnemyGroup_Melee(EnemyGroup *g, Player *p)
 {
     if (p->hp <= 0 || !p->isAttacking || p->attackHasHit || p->currentFrame < PLAYER_ATTACK_HIT_FRAME) return;
     p->attackHasHit = true;
     SDL_FRect box = Player_AttackBox(p);
-    EnemyTarget targets[ENEMY_TYPE_CAPACITY * 3];
+    EnemyTarget targets[ENEMY_TARGET_CAPACITY];
     int n = EnemyGroup_Targets(g, targets);
     float px = 6.0f * ((p->direction == PLAYER_RIGHT) - (p->direction == PLAYER_LEFT));
     float py = 6.0f * ((p->direction == PLAYER_DOWN) - (p->direction == PLAYER_UP));
@@ -71,7 +77,7 @@ static inline bool EnemyGroup_FindHit(EnemyGroup *g, float x, float y, float vx,
     float speed = sqrtf(vx * vx + vy * vy);
     float ux = speed > 0 ? vx / speed : 0, uy = speed > 0 ? vy / speed : 0;
     x += ux * tip; y += uy * tip;
-    EnemyTarget targets[ENEMY_TYPE_CAPACITY * 3];
+    EnemyTarget targets[ENEMY_TARGET_CAPACITY];
     int n = EnemyGroup_Targets(g, targets), nearest = -1;
     float best = INFINITY;
     for (int i = 0; i < n; ++i) {
@@ -102,7 +108,7 @@ static inline bool EnemyGroup_Sweep(EnemyGroup *g, float x, float y, float vx, f
 static inline void EnemyGroup_ArrowImpact(EnemyGroup *g, EnemyTarget target, const Projectile *s, float x, float y)
 {
     // Evaluate blast coverage before impact knockback changes target positions.
-    EnemyTarget targets[ENEMY_TYPE_CAPACITY * 3];
+    EnemyTarget targets[ENEMY_TARGET_CAPACITY];
     int n = EnemyGroup_Targets(g, targets);
     float speed = sqrtf(s->vx * s->vx + s->vy * s->vy);
     EnemyGroup_Damage(g, target, s->damage, speed > 0 ? s->vx / speed * (10.0f / 3.0f) : 0,
@@ -131,17 +137,24 @@ static inline void EnemyGroup_UpdateArrowEffects(EnemyGroup *g, float dt)
 {
     for (int i = 0; i < MAX_PROJECTILES; ++i)
         g->explosions[i].timer = fmaxf(0, g->explosions[i].timer - dt);
-    EnemyTarget targets[ENEMY_TYPE_CAPACITY * 3];
+    EnemyTarget targets[ENEMY_TARGET_CAPACITY];
     int n = EnemyGroup_Targets(g, targets);
     for (int i = 0; i < n; ++i) {
         EnemyTarget t = targets[i];
         EnemyBurn *burn = &g->burns[t.type][t.index];
+        if (t.type == 3 && g->king.hp > 0 && !King_Targetable(&g->king)) continue;
         if (t.hp <= 0) { *burn = (EnemyBurn){0}; continue; }
         burn->timer -= dt;
         while (burn->ticksLeft > 0 && burn->timer <= 0) {
             int damage = (burn->damageLeft + burn->ticksLeft - 1) / burn->ticksLeft;
             burn->damageLeft -= damage; --burn->ticksLeft;
             burn->timer += FIRE_ARROW_TICK_TIME;
+            if (t.type == 3) {
+                King_TakeDamage(&g->king, damage, false);
+                if (g->king.hp <= 0) { *burn = (EnemyBurn){0}; break; }
+                if (!King_Targetable(&g->king)) break;
+                continue;
+            }
             int *hp = t.type == 0 ? &g->ghouls[t.index].hp : t.type == 1 ? &g->slimes[t.index].hp : &g->eyes[t.index].hp;
             if (damage >= *hp) {
                 EnemyGroup_Damage(g, t, damage, 0, 0);
@@ -246,5 +259,6 @@ static inline void EnemyGroup_Update(EnemyGroup *g, Player *p, SlimeShot *shots,
     for (int i = 0; i < g->slimeCount; ++i) FleshSlime_Update(&g->slimes[i], p, shots, dt);
     for (int i = 0; i < g->eyeCount; ++i) EyeParasite_Update(&g->eyes[i], p, dt);
     if (p->hp > 0 && dt > 0) EnemyGroup_Separate(g, dt);
+    King_Update(&g->king, p, dt);
 }
 #endif
