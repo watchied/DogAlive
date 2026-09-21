@@ -18,7 +18,7 @@ typedef struct {
 
 static inline void Projectiles_Recharge(Player *p, float dt)
 {
-    if (p->hp <= 0) return;
+    if (p->hp <= 0 || !p->unlockedArrows) return;
     if (p->bowCharges >= PLAYER_BOW_MAX_CHARGES) { p->shootTimer = 0; return; }
     if (p->shootCooldown <= 0) { p->bowCharges = PLAYER_BOW_MAX_CHARGES; p->shootTimer = 0; return; }
     p->shootTimer -= dt;
@@ -37,7 +37,7 @@ static inline void Projectiles_Reset(Projectile *shots)
 // Start the bow animation; the arrow is created only on the middle frame.
 static inline bool Projectiles_Shoot(Projectile *shots, Player *p)
 {
-    if (p->hp <= 0 || p->isAttacking || p->isShooting || p->bowCharges < Arrow_ChargeCost(p->arrowType))
+    if (p->hp <= 0 || !Player_HasArrow(p, p->arrowType) || p->isAttacking || p->isCharging || p->isShooting || p->bowCharges < Arrow_ChargeCost(p->arrowType))
         return false;
     float dx = p->aimX, dy = p->aimY;
     float length = sqrtf(dx * dx + dy * dy);

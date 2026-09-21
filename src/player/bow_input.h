@@ -12,7 +12,10 @@ static inline void BowInput_Press(BowInput *input, uint64_t now)
 static inline void BowInput_Update(BowInput *input, Player *p, uint64_t now)
 {
     if (input->down && !input->switched && now - input->pressedAt >= BOW_TYPE_HOLD_MS) {
-        p->arrowType = (ArrowType)(((int)p->arrowType + 1) % 3);
+        for (int step = 1; step <= 3; ++step) {
+            ArrowType next = (ArrowType)(((int)p->arrowType + step) % 3);
+            if (Player_HasArrow(p, next)) { p->arrowType = next; break; }
+        }
         input->switched = true;
     }
 }

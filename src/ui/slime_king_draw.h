@@ -38,7 +38,10 @@ static inline const uint16_t *King_Sprite(const SlimeKing *k)
     case KING_BEAM_CHARGE: case KING_BEAM_FIRE:
         return slime_king_boss_sprite_2boss_attack5[King_VisualFrame(k->state == KING_BEAM_FIRE ? KING_BEAM_CHARGE_TIME : k->timer,
             KING_BEAM_CHARGE_TIME, SLIME_KING_BOSS_SPRITE_2BOSS_ATTACK5_COUNT)];
-    default: return slime_king_boss_walk[(int)(k->timer / 0.1f) % SLIME_KING_BOSS_WALK_COUNT];
+    default:
+        if (k->phase == 2)
+            return slime_king_boss_walk2[(int)(k->timer / 0.1f) % SLIME_KING_WALK_WALK2_COUNT];
+        return slime_king_boss_walk[(int)(k->timer / 0.1f) % SLIME_KING_BOSS_WALK_COUNT];
     }
 }
 // Source art is drawn at native size. Projectile pixels rotate around their center.
@@ -87,8 +90,6 @@ static inline void King_Draw(SDL_Renderer *r, const SlimeKing *k)
         float lift = k->state == KING_SLAM_FALL ? KING_SLAM_HEIGHT * (1 - fminf(1, k->timer / KING_SLAM_FALL_TIME)) : 0;
         King_DrawPixels(r, k->x + 24, k->y + 24 - lift, King_Sprite(k), SLIME_KING_BOSS_WIDTH, SLIME_KING_BOSS_HEIGHT, 0,
             k->flashTimer > 0);
-        if (k->phase == 2 && (k->state == KING_IDLE || k->state == KING_STUN))
-            King_DrawPixels(r, k->x + 24, k->y + 24, slime_king_boss_crown[0], SLIME_KING_BOSS_WIDTH, SLIME_KING_BOSS_HEIGHT, 0, k->flashTimer > 0);
     }
     for (int i = 0; i < KING_SHOT_CAPACITY; ++i) {
         const KingShot *s = &k->shots[i];

@@ -80,7 +80,7 @@ static inline void SlimeShots_Update(SlimeShot *shots, Player *p, float dt)
         float step = fminf(dt, s->lifetime);
         float nx = s->x + s->vx * step, ny = s->y + s->vy * step;
         float x1 = s->x, y1 = s->y, x2 = nx, y2 = ny;
-        SDL_FRect body = {p->x - 2, p->y - 2, ACTOR_SIZE + 4, ACTOR_SIZE + 4};
+        SDL_FRect body = Player_ExpandedBody(p, 2, 2);
         if (!s->reflected && SDL_GetRectAndLineIntersectionFloat(&body, &x1, &y1, &x2, &y2)) {
             Enemy_HurtPlayer(p, s->damage, s->x, s->y);
             s->active = false;

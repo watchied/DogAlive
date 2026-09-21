@@ -8,23 +8,41 @@
 
 #define PLAYER_START_X 100.0f
 #define PLAYER_START_Y 100.0f
+// Starting equipment: 0 = locked, 1 = owned. Applied when starting a new run.
+#define PLAYER_START_NORMAL_ARROW 0
+#define PLAYER_START_FIRE_ARROW 0
+#define PLAYER_START_EXPLOSIVE_ARROW 0
+#define PLAYER_START_ENCHANT_BLADE 1
 #define PLAYER_DEFAULT_SPEED 40.0f
-#define PLAYER_MAX_HP 100
+#define PLAYER_MAX_HP 150
+#define PLAYER_HITBOX_SIZE 13.0f
+#define PLAYER_HITBOX_OFFSET ((ACTOR_SIZE - PLAYER_HITBOX_SIZE) / 2.0f)
 #define PLAYER_COLLISION_GRACE_TIME 0.5f
 #define PLAYER_HIT_FLASH_TIME 0.16f
 #define PLAYER_INVINCIBILITY_TIME 0.3f
 #define PLAYER_HIT_KNOCKBACK 2.0f
-#define PLAYER_MAX_STAMINA 100
+#define PLAYER_MAX_STAMINA 120
 #define PLAYER_SPRINT_MULTIPLIER 1.7f
-#define PLAYER_STAMINA_DRAIN 25.0f
+#define PLAYER_STAMINA_DRAIN 20.0f
 #define PLAYER_MELEE_REACH 12.0f // Melee reach in world pixels; affects attacks and slime parries.
-#define PLAYER_STAMINA_REGEN 20.0f
+#define PLAYER_STAMINA_REGEN 30.0f
 #define PLAYER_SPRINT_MIN_STAMINA 20.0f
 #define PLAYER_DOUBLE_TAP_TIME 0.25f
-#define PLAYER_ATTACK_DAMAGE 25
-#define PLAYER_ARROW_DAMAGE 15
+#define PLAYER_ATTACK_DAMAGE 40
+#define PLAYER_MELEE_STAMINA_COST 15.0f // Stamina spent once when starting a slash.
+#define PLAYER_CHARGE_TIME 2.5f
+#define PLAYER_CHARGE_REACH 64.0f // Forward distance from the player's center.
+#define PLAYER_CHARGE_WIDTH 80.0f // Width perpendicular to the facing direction.
+#define PLAYER_CHARGE_MOVE_MULTIPLIER 0.7f
+#define PLAYER_CHARGE_DAMAGE_MULTIPLIER 2.0f
+#define PLAYER_CHARGE_STAMINA_COST 15.0f
+#define PLAYER_PARRY_START_TIME 0.2f
+#define PLAYER_PARRY_END_TIME 0.6f
+#define PLAYER_PARRY_FLASH_TIME 0.16f
+#define PLAYER_PARRY_EFFECT_TIME 0.6f
+#define PLAYER_ARROW_DAMAGE 20
 #define PLAYER_ARROW_SPEED 200.0f
-#define PLAYER_SHOOT_COOLDOWN 2.5f
+#define PLAYER_SHOOT_COOLDOWN 3.0f
 #define PLAYER_BOW_MAX_CHARGES 3
 #define FIRE_ARROW_BURN_MULTIPLIER 1.5f
 #define FIRE_ARROW_TICKS 6
@@ -59,6 +77,7 @@ typedef struct
     int deathFrame;
     float deathTimer;
     float hitFlashTimer;
+    float parryEffectTimer, parryEffectX, parryEffectY;
     float collisionGraceTimer;
     float invincibilityTimer;
     int maxHP;
@@ -75,6 +94,7 @@ typedef struct
     float arrowLifetime;
     float shootTimer;
     int bowCharges;
+    unsigned int unlockedArrows; // One bit per ArrowType; a new run starts without a bow.
     ArrowType arrowType;
     ArrowType shootingArrowType; // Snapshot so switching cannot change an already paid shot.
     bool isShooting;
@@ -95,11 +115,44 @@ typedef struct
     bool isAttacking;
     bool attackWasDown;
     bool attackHasHit;
+    unsigned int meleeSwingId;
+    bool enchantBlade;
+    bool isCharging;
+    bool chargedAttack;
+    float chargeTimer;
 } Player;
+
+static inline void Player_ShowParry(Player *p, float enemyX, float enemyY)
+{
+    p->parryEffectTimer = PLAYER_PARRY_EFFECT_TIME;
+    p->parryEffectX = (p->x + ACTOR_HALF_SIZE + enemyX) / 2;
+    p->parryEffectY = (p->y + ACTOR_HALF_SIZE + enemyY) / 2;
+}
+
+static inline SDL_FRect Player_Body(const Player *p)
+{
+    return (SDL_FRect){p->x + PLAYER_HITBOX_OFFSET, p->y + PLAYER_HITBOX_OFFSET,
+        PLAYER_HITBOX_SIZE, PLAYER_HITBOX_SIZE};
+}
+static inline SDL_FRect Player_ExpandedBody(const Player *p, float x, float y)
+{
+    SDL_FRect b = Player_Body(p);
+    b.x -= x; b.y -= y; b.w += 2*x; b.h += 2*y;
+    return b;
+}
 
 // Player melee hitbox extends from the front edge of the body.
 static inline SDL_FRect Player_AttackBox(const Player *p)
 {
+    if (p->chargedAttack) {
+        float cx = p->x + ACTOR_HALF_SIZE, cy = p->y + ACTOR_HALF_SIZE;
+        switch (p->direction) {
+        case PLAYER_UP: return (SDL_FRect){cx - PLAYER_CHARGE_WIDTH / 2, cy - PLAYER_CHARGE_REACH, PLAYER_CHARGE_WIDTH, PLAYER_CHARGE_REACH};
+        case PLAYER_DOWN: return (SDL_FRect){cx - PLAYER_CHARGE_WIDTH / 2, cy, PLAYER_CHARGE_WIDTH, PLAYER_CHARGE_REACH};
+        case PLAYER_LEFT: return (SDL_FRect){cx - PLAYER_CHARGE_REACH, cy - PLAYER_CHARGE_WIDTH / 2, PLAYER_CHARGE_REACH, PLAYER_CHARGE_WIDTH};
+        default: return (SDL_FRect){cx, cy - PLAYER_CHARGE_WIDTH / 2, PLAYER_CHARGE_REACH, PLAYER_CHARGE_WIDTH};
+        }
+    }
     switch (p->direction)
     {
     case PLAYER_UP:
@@ -127,11 +180,48 @@ static inline void Player_Init(Player *player)
         .arrowDamage = PLAYER_ARROW_DAMAGE,
         .arrowSpeed = PLAYER_ARROW_SPEED,
         .shootCooldown = PLAYER_SHOOT_COOLDOWN,
-        .bowCharges = PLAYER_BOW_MAX_CHARGES,
+        .bowCharges = 0,
         .arrowLifetime = PLAYER_ARROW_LIFETIME,
         .aimX = 1.0f,
         .aimY = 0.0f,
         .direction = PLAYER_RIGHT};
+    player->unlockedArrows = (PLAYER_START_NORMAL_ARROW ? 1u << ARROW_NORMAL : 0) |
+        (PLAYER_START_FIRE_ARROW ? 1u << ARROW_FIRE : 0) |
+        (PLAYER_START_EXPLOSIVE_ARROW ? 1u << ARROW_EXPLOSIVE : 0);
+    player->enchantBlade = PLAYER_START_ENCHANT_BLADE != 0;
+    if (player->unlockedArrows) {
+        player->bowCharges = PLAYER_BOW_MAX_CHARGES;
+        // Select the first owned type, even when normal arrows are disabled.
+        for (int type = ARROW_NORMAL; type <= ARROW_EXPLOSIVE; ++type)
+            if (player->unlockedArrows & (1u << type)) {
+                player->arrowType = (ArrowType)type;
+                break;
+            }
+    }
+}
+
+static inline int Player_MeleeDamage(const Player *p)
+{
+    return (int)(p->attackDamage * (p->chargedAttack ? PLAYER_CHARGE_DAMAGE_MULTIPLIER : 1.0f));
+}
+static inline bool Player_ParryActive(const Player *p)
+{
+    float time = p->currentFrame * MELEE_ACTOR_FRAME_TIME + p->animTimer;
+    return p->hp > 0 && p->isAttacking && time >= PLAYER_PARRY_START_TIME && time < PLAYER_PARRY_END_TIME;
+}
+
+static inline bool Player_HasArrow(const Player *p, ArrowType type)
+{
+    return (p->unlockedArrows & (1u << type)) != 0;
+}
+
+static inline void Player_UnlockArrow(Player *p, ArrowType type)
+{
+    if (Player_HasArrow(p, type)) return;
+    p->unlockedArrows |= 1u << type;
+    p->arrowType = type;
+    p->bowCharges = PLAYER_BOW_MAX_CHARGES;
+    p->shootTimer = 0;
 }
 
 #endif

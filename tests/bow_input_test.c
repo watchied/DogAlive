@@ -5,6 +5,9 @@ int main(void)
 {
     Player p;
     Player_Init(&p);
+    Player_UnlockArrow(&p, ARROW_FIRE);
+    Player_UnlockArrow(&p, ARROW_EXPLOSIVE);
+    Player_UnlockArrow(&p, ARROW_NORMAL);
     BowInput input = {0};
     BowInput_Press(&input, 1000);
     assert(BowInput_Release(&input, &p, 1100));

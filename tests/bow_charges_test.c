@@ -7,6 +7,12 @@ int main(void)
     Player p;
     Player_Init(&p);
     Projectile shots[MAX_PROJECTILES] = {0};
+    assert(p.bowCharges == 0 && !p.unlockedArrows);
+    Projectiles_Recharge(&p, 100);
+    assert(p.bowCharges == 0 && !Projectiles_Shoot(shots, &p));
+    Player_UnlockArrow(&p, ARROW_FIRE);
+    Player_UnlockArrow(&p, ARROW_EXPLOSIVE);
+    Player_UnlockArrow(&p, ARROW_NORMAL);
     assert(p.bowCharges == 3);
     for (int i = 0; i < 3; ++i) {
         assert(Projectiles_Shoot(shots, &p));
@@ -32,6 +38,7 @@ int main(void)
     assert(shots[4].type == ARROW_EXPLOSIVE);
     // Full pool must not consume charges.
     Player_Init(&p);
+    Player_UnlockArrow(&p, ARROW_NORMAL);
     for (int i = 0; i < MAX_PROJECTILES; ++i) shots[i].active = true;
     assert(!Projectiles_Shoot(shots, &p) && p.bowCharges == 3);
 

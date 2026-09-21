@@ -12,6 +12,18 @@ static int active_shots(const SlimeKing *k)
 int main(void)
 {
     Player p;
+    SlimeKing walking = {.phase = 2, .state = KING_IDLE};
+    for (int i = 0; i < SLIME_KING_WALK_WALK2_COUNT; ++i) {
+        walking.timer = (i + 0.5f) * 0.1f;
+        assert(King_Sprite(&walking) == slime_king_boss_walk2[i]);
+    }
+    for (int i = 0; i < ARROW_EXPLOSION_8FRAMES_DARK_FRAMES_COUNT; ++i)
+        assert(Explosion_Frame(ARROW_EXPLOSION_TIME - (i + 0.5f) * 0.06f,
+            arrow_explosion_8frames_dark_frames_duration_ms, ARROW_EXPLOSION_8FRAMES_DARK_FRAMES_COUNT) == i);
+    for (int i = 0; i < FLESH_BURST_FRAMES_COUNT; ++i)
+        assert(Explosion_Frame(EYE_EXPLOSION_TIME - (i + 0.5f) * 0.06f,
+            flesh_burst_frames_duration_ms, FLESH_BURST_FRAMES_COUNT) == i);
+    assert(Explosion_Frame(0, flesh_burst_frames_duration_ms, FLESH_BURST_FRAMES_COUNT) == -1);
     Player_Init(&p);
     p.x = 24; p.y = 110;
     SlimeKing k;
@@ -153,25 +165,25 @@ int main(void)
     assert(group.king.state == KING_NPC && Stage_EnemiesAlive(&group) == 0);
 
     // Gate stays locked during the death animation, then unlocks and preserves NPC on return.
-    StageProgress stage = {0};
+    StageProgress stage = {.index = STAGE_BOSS_ROOM};
     SlimeShot shots[SLIME_SHOT_CAPACITY] = {0};
     RunningEffect effects = {0};
     Player_Init(&p);
-    Stage_Load(0, &p, &group, arrows, shots, &effects);
-    SDL_FRect exit = Stage_ExitBox(0);
+    Stage_Load(STAGE_BOSS_ROOM, &p, &group, arrows, shots, &effects);
+    SDL_FRect exit = Stage_DoorBox(STAGE_TOP, 0.5f);
     p.x = exit.x; p.y = exit.y;
     Stage_Update(&stage, &p, &group, arrows, shots, &effects);
-    assert(stage.index == 0);
+    assert(stage.index == STAGE_BOSS_ROOM);
     King_Enter(&group.king, KING_IDLE);
     King_TakeDamage(&group.king, KING_MAX_HP, true);
     Stage_Update(&stage, &p, &group, arrows, shots, &effects);
-    assert(stage.index == 0);
+    assert(stage.index == STAGE_BOSS_ROOM);
     King_Update(&group.king, &p, KING_DEATH_TIME);
     Stage_Update(&stage, &p, &group, arrows, shots, &effects);
-    assert(stage.index == 1);
-    exit = Stage_BackBox(1); p.x = exit.x; p.y = exit.y;
+    assert(stage.index == STAGE_REWARD_ROOM);
+    exit = Stage_BackBox(STAGE_REWARD_ROOM); p.x = exit.x; p.y = exit.y;
     Stage_Update(&stage, &p, &group, arrows, shots, &effects);
-    assert(stage.index == 0 && group.king.state == KING_NPC);
+    assert(stage.index == STAGE_BOSS_ROOM && group.king.state == KING_NPC);
     // Every state selects a safe sprite pointer (NPC has a separate smaller sprite).
     for (int state = KING_INTRO; state < KING_NPC; ++state) {
         King_Enter(&k, (KingState)state);

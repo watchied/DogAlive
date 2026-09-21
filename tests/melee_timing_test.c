@@ -6,8 +6,25 @@
 int main(void)
 {
     Player p;
-    Player_Init(&p);
+    Player_Init(&p); p.enchantBlade = false; // Test immediate normal slash independently of starting gear.
     bool keys[SDL_SCANCODE_COUNT] = {0};
+    // Spend once per accepted swing, reject unaffordable/busy requests.
+    p.stamina = PLAYER_MELEE_STAMINA_COST;
+    keys[SDL_SCANCODE_SPACE] = true;
+    Game_Update(&p, keys, 0.01f);
+    assert(p.isAttacking && p.stamina == 0);
+    Game_Update(&p, keys, 0.01f);
+    assert(p.stamina == 0);
+    Player_Init(&p); p.enchantBlade = false; // Test immediate normal slash independently of starting gear.
+    p.stamina = PLAYER_MELEE_STAMINA_COST - 1;
+    Game_Update(&p, keys, 0.01f);
+    assert(!p.isAttacking && p.stamina == PLAYER_MELEE_STAMINA_COST - 1);
+    Player_Init(&p); p.enchantBlade = false; // Test immediate normal slash independently of starting gear.
+    p.isShooting = true;
+    float stamina = p.stamina;
+    Game_Update(&p, keys, 0.01f);
+    assert(!p.isAttacking && p.stamina == stamina);
+    Player_Init(&p); p.enchantBlade = false; // Test immediate normal slash independently of starting gear.
     keys[SDL_SCANCODE_SPACE] = true;
     EnemyGroup enemies = {.ghoulCount = 1};
     Ghoul_Init(&enemies.ghouls[0], p.x + ACTOR_SIZE, p.y);
@@ -24,7 +41,7 @@ int main(void)
         }
     }
     assert(hit);
-    Player_Init(&p);
+    Player_Init(&p); p.enchantBlade = false; // Test immediate normal slash independently of starting gear.
     Ghoul g;
     Ghoul_Init(&g, p.x, p.y);
     g.state = GHOUL_ATTACK;

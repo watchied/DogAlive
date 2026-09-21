@@ -112,6 +112,7 @@ static inline void HUD_Draw(SDL_Renderer *renderer, const Player *p)
         STAMINA_UI_WIDTH, p->maxStamina > 0 ? p->stamina / p->maxStamina : 0,
         stamina_bar_frames, STAMINA_BAR_WIDTH, STAMINA_BAR_HEIGHT,
         stamina_frames, STAMINA_WIDTH, STAMINA_HEIGHT, 0, 2);
+    if (!p->unlockedArrows) return;
     float ready = p->shootCooldown > 0 ? 1 - p->shootTimer / p->shootCooldown : 1;
     float bowY = stamina.y + stamina.h + 4;
     for (int i = 0; i < PLAYER_BOW_MAX_CHARGES; ++i)

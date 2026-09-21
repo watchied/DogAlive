@@ -66,8 +66,8 @@ static inline void Enemies_CheckPlayerAttack(Ghoul *g, FleshSlime *f, EyeParasit
     SDL_FRect eye = {e->x, e->y, ACTOR_SIZE, ACTOR_SIZE};
     float px = 6.0f * ((p->direction == PLAYER_RIGHT) - (p->direction == PLAYER_LEFT));
     float py = 6.0f * ((p->direction == PLAYER_DOWN) - (p->direction == PLAYER_UP));
-    if (SDL_HasRectIntersectionFloat(&attack, &slime)) FleshSlime_TakeDamage(f, p->attackDamage, px, py);
-    if (SDL_HasRectIntersectionFloat(&attack, &eye)) EyeParasite_TakeDamage(e, p->attackDamage, px, py);
+    if (SDL_HasRectIntersectionFloat(&attack, &slime)) FleshSlime_TakeDamage(f, Player_MeleeDamage(p), px, py);
+    if (SDL_HasRectIntersectionFloat(&attack, &eye)) EyeParasite_TakeDamage(e, Player_MeleeDamage(p), px, py);
 }
 
 // Check additional targets before the original arrow update, without moving arrows twice.

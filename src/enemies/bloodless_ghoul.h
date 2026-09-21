@@ -30,6 +30,8 @@ typedef struct
     PlayerDirection direction;
     GhoulState state;
     bool hasHit;
+    bool wasParried;
+    unsigned int parriedSwingId;
 } Ghoul;
 
 static inline void Ghoul_Init(Ghoul *g, float x, float y)
@@ -90,8 +92,25 @@ static inline void Ghoul_TakeDamage(Ghoul *g, int damage, float pushX, float pus
     }
 }
 
+// Resolve the clash before either melee damage path. Remember this swing so a
+// parry before the player's damage frame cannot become a damaging hit later.
+static inline bool Ghoul_TryParry(Ghoul *g, Player *p)
+{
+    if (g->wasParried && p->isAttacking && g->parriedSwingId == p->meleeSwingId) return true;
+    if (g->hp <= 0 || g->state != GHOUL_ATTACK || g->hasHit ||
+        g->timer < GHOUL_ATTACK_WINDUP + MELEE_SLASH_START_TIME || !Player_ParryActive(p) ||
+        !Ghoul_Overlaps(Player_AttackBox(p), Ghoul_AttackBox(g))) return false;
+    g->hasHit = true;
+    g->wasParried = true;
+    g->parriedSwingId = p->meleeSwingId;
+    p->hitFlashTimer = g->hitFlashTimer = PLAYER_PARRY_FLASH_TIME;
+    Player_ShowParry(p,g->x+ACTOR_HALF_SIZE,g->y+ACTOR_HALF_SIZE);
+    return true;
+}
+
 static inline void Ghoul_CheckPlayerAttack(Ghoul *g, Player *p)
 {
+    if (Ghoul_TryParry(g, p)) return;
     if (g->hp <= 0 || p->hp <= 0)
         return;
 
@@ -116,7 +135,7 @@ static inline void Ghoul_CheckPlayerAttack(Ghoul *g, Player *p)
         case PLAYER_LEFT: pushX = -6.0f; break;
         case PLAYER_RIGHT: pushX = 6.0f; break;
     }
-    Ghoul_TakeDamage(g, p->attackDamage, pushX, pushY);
+    Ghoul_TakeDamage(g, Player_MeleeDamage(p), pushX, pushY);
 }
 
 static inline void Ghoul_Update(
@@ -155,7 +174,7 @@ static inline void Ghoul_Update(
     }
 
     // ผู้เล่นและ Ghoul แสดงผลขนาด 16×16
-    SDL_FRect playerBox = {player->x, player->y, ACTOR_SIZE, ACTOR_SIZE};
+    SDL_FRect playerBox = Player_Body(player);
     if (g->hp <= 0)
         return;
     if (player->hp <= 0)
@@ -183,6 +202,7 @@ static inline void Ghoul_Update(
         g->frame = attackFrame < BLOODLESS_GHOUL_MELEE_ENEMY_SLASH_COUNT
             ? attackFrame : BLOODLESS_GHOUL_MELEE_ENEMY_SLASH_COUNT - 1;
 
+        Ghoul_TryParry(g, player);
         if (!g->hasHit && g->frame >= GHOUL_ATTACK_HIT_FRAME)
         {
             g->hasHit = true;
@@ -292,8 +312,8 @@ static inline void Ghoul_ResolvePlayerCollision(const Ghoul *g, Player *p)
         return;
     float dx = p->x - g->x;
     float dy = p->y - g->y;
-    float overlapX = ACTOR_SIZE - fabsf(dx);
-    float overlapY = ACTOR_SIZE - fabsf(dy);
+    float overlapX = (ACTOR_SIZE + PLAYER_HITBOX_SIZE) / 2 - fabsf(dx);
+    float overlapY = (ACTOR_SIZE + PLAYER_HITBOX_SIZE) / 2 - fabsf(dy);
     if (overlapX <= 0.0f || overlapY <= 0.0f)
         return;
     if (overlapX < overlapY)

@@ -2,7 +2,8 @@
 #define ENEMY_GROUP_H
 #include "src/combat/enemy_combat.h"
 #include "src/enemies/slime_king.h"
-#define ENEMY_TARGET_CAPACITY (ENEMY_TYPE_CAPACITY * 3 + 1)
+#include "src/enemies/flesh_coffin.h"
+#define ENEMY_TARGET_CAPACITY (ENEMY_TYPE_CAPACITY * 3 + 5)
 
 typedef struct { int damageLeft, ticksLeft; float timer; } EnemyBurn;
 typedef struct { float x, y, timer; } ArrowExplosion;
@@ -11,9 +12,10 @@ typedef struct {
     FleshSlime slimes[ENEMY_TYPE_CAPACITY];
     EyeParasite eyes[ENEMY_TYPE_CAPACITY];
     int ghoulCount, slimeCount, eyeCount;
-    EnemyBurn burns[4][ENEMY_TYPE_CAPACITY];
+    EnemyBurn burns[6][ENEMY_TYPE_CAPACITY];
     ArrowExplosion explosions[MAX_PROJECTILES];
     SlimeKing king;
+    FleshCoffin coffin;
 } EnemyGroup;
 
 static inline void EnemyGroup_InitCounts(EnemyGroup *group, int ghouls, int slimes, int eyes)
@@ -48,6 +50,11 @@ static inline int EnemyGroup_Targets(EnemyGroup *g, EnemyTarget *targets)
         targets[n++] = (EnemyTarget){{g->eyes[i].x, g->eyes[i].y, ACTOR_SIZE, ACTOR_SIZE}, g->eyes[i].hp, 2, i};
     if (g->king.active)
         targets[n++] = (EnemyTarget){King_Body(&g->king), King_Targetable(&g->king) ? g->king.hp : 0, 3, 0};
+    if (g->coffin.active) {
+        targets[n++] = (EnemyTarget){Coffin_Body(&g->coffin), Coffin_Targetable(&g->coffin) ? g->coffin.hp : 0, 4, 0};
+        for (int i=0;i<3;++i) if(g->coffin.swords[i].active && g->coffin.swordHP>0)
+            targets[n++] = (EnemyTarget){Coffin_SwordBody(&g->coffin.swords[i]),g->coffin.swordHP,5,i};
+    }
     return n;
 }
 static inline void EnemyGroup_Damage(EnemyGroup *g, EnemyTarget t, int damage, float px, float py)
@@ -56,9 +63,13 @@ static inline void EnemyGroup_Damage(EnemyGroup *g, EnemyTarget t, int damage, f
     if (t.type == 1) FleshSlime_TakeDamage(&g->slimes[t.index], damage, px, py);
     if (t.type == 2) EyeParasite_TakeDamage(&g->eyes[t.index], damage, px, py);
     if (t.type == 3) King_TakeDamage(&g->king, damage, true);
+    if (t.type == 4) Coffin_Damage(&g->coffin, damage);
+    if (t.type == 5) Coffin_DamageSwords(&g->coffin, damage);
 }
 static inline void EnemyGroup_Melee(EnemyGroup *g, Player *p)
 {
+    for (int i = 0; i < g->ghoulCount; ++i) Ghoul_TryParry(&g->ghouls[i], p);
+    Coffin_Parry(&g->coffin,p);
     if (p->hp <= 0 || !p->isAttacking || p->attackHasHit || p->currentFrame < PLAYER_ATTACK_HIT_FRAME) return;
     p->attackHasHit = true;
     SDL_FRect box = Player_AttackBox(p);
@@ -67,8 +78,11 @@ static inline void EnemyGroup_Melee(EnemyGroup *g, Player *p)
     float px = 6.0f * ((p->direction == PLAYER_RIGHT) - (p->direction == PLAYER_LEFT));
     float py = 6.0f * ((p->direction == PLAYER_DOWN) - (p->direction == PLAYER_UP));
     for (int i = 0; i < n; ++i)
-        if (targets[i].hp > 0 && SDL_HasRectIntersectionFloat(&box, &targets[i].body))
-            EnemyGroup_Damage(g, targets[i], p->attackDamage, px, py);
+        if (targets[i].hp > 0 &&
+            !(targets[i].type == 0 && Ghoul_TryParry(&g->ghouls[targets[i].index], p)) &&
+            !(targets[i].type == 4 && Coffin_Parry(&g->coffin,p)) &&
+            SDL_HasRectIntersectionFloat(&box, &targets[i].body))
+            EnemyGroup_Damage(g, targets[i], Player_MeleeDamage(p), px, py);
 }
 // Search every living enemy for the first intersection along this segment.
 static inline bool EnemyGroup_FindHit(EnemyGroup *g, float x, float y, float vx, float vy,
@@ -128,7 +142,7 @@ static inline void EnemyGroup_ArrowImpact(EnemyGroup *g, EnemyTarget target, con
         }
         for (int i = 0; i < MAX_PROJECTILES; ++i)
             if (g->explosions[i].timer <= 0) {
-                g->explosions[i] = (ArrowExplosion){x, y, 0.25f}; break;
+                g->explosions[i] = (ArrowExplosion){x, y, ARROW_EXPLOSION_TIME}; break;
             }
     }
 }
@@ -143,12 +157,19 @@ static inline void EnemyGroup_UpdateArrowEffects(EnemyGroup *g, float dt)
         EnemyTarget t = targets[i];
         EnemyBurn *burn = &g->burns[t.type][t.index];
         if (t.type == 3 && g->king.hp > 0 && !King_Targetable(&g->king)) continue;
+        if (t.type == 4 && g->coffin.hp > 0 && !Coffin_Targetable(&g->coffin)) continue;
         if (t.hp <= 0) { *burn = (EnemyBurn){0}; continue; }
         burn->timer -= dt;
         while (burn->ticksLeft > 0 && burn->timer <= 0) {
             int damage = (burn->damageLeft + burn->ticksLeft - 1) / burn->ticksLeft;
             burn->damageLeft -= damage; --burn->ticksLeft;
             burn->timer += FIRE_ARROW_TICK_TIME;
+            if (t.type >= 4) {
+                EnemyGroup_Damage(g,t,damage,0,0);
+                if ((t.type==4 && g->coffin.hp<=0) || (t.type==5 && g->coffin.swordHP<=0)) { *burn=(EnemyBurn){0};break; }
+                if(t.type==4 && !Coffin_Targetable(&g->coffin)) break;
+                continue;
+            }
             if (t.type == 3) {
                 King_TakeDamage(&g->king, damage, false);
                 if (g->king.hp <= 0) { *burn = (EnemyBurn){0}; break; }
@@ -260,5 +281,7 @@ static inline void EnemyGroup_Update(EnemyGroup *g, Player *p, SlimeShot *shots,
     for (int i = 0; i < g->eyeCount; ++i) EyeParasite_Update(&g->eyes[i], p, dt);
     if (p->hp > 0 && dt > 0) EnemyGroup_Separate(g, dt);
     King_Update(&g->king, p, dt);
+    Coffin_Update(&g->coffin,p,dt);
+    Coffin_ResolvePlayerCollision(&g->coffin,p);
 }
 #endif

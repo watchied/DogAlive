@@ -15,6 +15,7 @@ void Game_Update(Player *player, const bool *keyboardState, float deltaTime)
     // ตรวจการกด Space ครั้งใหม่
     bool attackDown = keyboardState[SDL_SCANCODE_SPACE];
     bool attackPressed = attackDown && !player->attackWasDown;
+    bool attackReleased = !attackDown && player->attackWasDown;
     player->attackWasDown = attackDown;
 
     int dx =
@@ -31,7 +32,7 @@ void Game_Update(Player *player, const bool *keyboardState, float deltaTime)
 
     bool down[4] = {dy > 0, dy < 0, dx < 0, dx > 0};
     unsigned int held = 0;
-    bool actionBusy = player->isShooting || player->isAttacking || attackPressed;
+    bool actionBusy = player->isShooting || player->isAttacking || player->isCharging || attackPressed;
     for (int i = 0; i < 4; ++i) {
         unsigned int bit = 1u << i;
         player->tapRemaining[i] = fmaxf(0.0f, player->tapRemaining[i] - deltaTime);
@@ -70,9 +71,30 @@ void Game_Update(Player *player, const bool *keyboardState, float deltaTime)
     if (player->isShooting)
         return;
 
-    if (attackPressed && !player->isAttacking)
+    bool startAttack = attackPressed && !player->enchantBlade;
+    bool charged = false;
+    if (player->enchantBlade && attackPressed && !player->isAttacking && player->hp > 0) {
+        player->isCharging = true;
+        player->chargeTimer = 0;
+        player->currentFrame = 0; player->animTimer = 0;
+    }
+    if (player->isCharging) {
+        if (attackDown) player->chargeTimer = fminf(PLAYER_CHARGE_TIME, player->chargeTimer + deltaTime);
+        if (attackReleased) {
+            charged = player->chargeTimer >= PLAYER_CHARGE_TIME;
+            startAttack = true;
+            player->isCharging = false;
+            player->chargeTimer = 0;
+        }
+    }
+    float attackCost = charged ? PLAYER_CHARGE_STAMINA_COST : PLAYER_MELEE_STAMINA_COST;
+    if (startAttack && !player->isAttacking && player->hp > 0 &&
+        player->stamina >= attackCost)
     {
+        player->stamina -= attackCost;
+        player->chargedAttack = charged;
         player->isAttacking = true;
+        ++player->meleeSwingId;
         player->attackHasHit = false; // รีเซ็ตทุกครั้งที่เริ่มตี
         player->currentFrame = 0;
         player->animTimer = 0.0f;
@@ -103,11 +125,11 @@ void Game_Update(Player *player, const bool *keyboardState, float deltaTime)
             }
         }
 
-        return;
+        if (!player->chargedAttack) return;
     }
 
     // D-pad aiming: keep the last direction when all movement buttons are released.
-    if (dx != 0 || dy != 0) {
+    if (!player->isAttacking && (dx != 0 || dy != 0)) {
         float aimScale = (dx != 0 && dy != 0) ? 0.70710678f : 1.0f;
         player->aimX = dx * aimScale;
         player->aimY = dy * aimScale;
@@ -122,8 +144,13 @@ void Game_Update(Player *player, const bool *keyboardState, float deltaTime)
     player->isMoving = dx != 0 || dy != 0;
 
     float diagonalScale = (dx != 0 && dy != 0) ? 0.70710678f : 1.0f;
+    if (player->isCharging || (player->isAttacking && player->chargedAttack))
+        moveMultiplier = PLAYER_CHARGE_MOVE_MULTIPLIER;
     player->x += dx * diagonalScale * player->speed * moveMultiplier * deltaTime;
     player->y += dy * diagonalScale * player->speed * moveMultiplier * deltaTime;
+
+    // A released charged swing can move, but keeps its facing and attack animation.
+    if (player->isAttacking) return;
 
     // เดินขึ้น = เห็นด้านหลังตัวละคร
     if (dy < 0)

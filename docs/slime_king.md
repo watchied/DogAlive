@@ -1,4 +1,4 @@
-# Slime King (floor 1)
+# Slime King (boss room)
 
 All balance values are in **`src/enemies/slime_king_config.h`**. Save changes, close the running game, and run `run_game.cmd` to rebuild.
 
@@ -27,7 +27,7 @@ Additional settings cover projectile sizes, lifetimes, intro/transition duration
 
 ## Encounter
 
-- Floor 1 contains the boss instead of regular enemies. `stageDefinitions` in `src/core/stages.h` has a final `slimeKing` flag; only floor 1 sets it to `true`.
+- The boss room follows the starting checkpoint room. `stageDefinitions` in `src/core/stages.h` has a final `slimeKing` flag. Defeating the boss opens the reward room above it.
 - Phase 1: bubble, locked-direction dash, and burrow/slam combos.
 - Phase 2: bubble and dash remain; the slam combo is replaced by radial lasers, rotating lasers, and the charged beam.
 - Dash direction locks during its warning. Each slam locks a new player position when its warning circle appears. Move out of the circle before landing.

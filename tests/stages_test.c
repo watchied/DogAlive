@@ -11,19 +11,20 @@ int main(void)
     RunningEffect effect = {0};
     StageProgress stage = {0};
     Stage_Load(0, &p, &enemies, arrows, shots, &effect);
-    p.x = GAME_WIDTH; p.y = GAME_HEIGHT / 2;
+    p.x = GAME_WIDTH; p.y = 40;
     Stage_Update(&stage, &p, &enemies, arrows, shots, &effect);
     assert(stage.index == 0 && p.x == GAME_WIDTH - STAGE_WALL_SIZE - ACTOR_SIZE);
     p.x = -100; p.y = 1000;
     Stage_ClampPlayer(&p);
     assert(p.x == STAGE_WALL_SIZE && p.y == GAME_HEIGHT - STAGE_WALL_SIZE - ACTOR_SIZE);
     p.hp = 50; p.bowCharges = 1;
-    for (int level = 0; level < STAGE_COUNT; ++level) {
+    for (int level = 0; level < STAGE_COUNT; level = Stage_Next(level)) {
         assert(stage.index == level);
         for (int i = 0; i < enemies.ghoulCount; ++i) enemies.ghouls[i].hp = 0;
         for (int i = 0; i < enemies.slimeCount; ++i) enemies.slimes[i].hp = 0;
         for (int i = 0; i < enemies.eyeCount; ++i) enemies.eyes[i].hp = 0;
         if (enemies.king.active) { enemies.king.hp = 0; enemies.king.state = KING_NPC; }
+        if (enemies.coffin.active) { enemies.coffin.hp = 0; enemies.coffin.state = FC_DEAD; }
         assert(Stage_EnemiesAlive(&enemies) == 0);
         p.x = 24; p.y = 100;
         Stage_Update(&stage, &p, &enemies, arrows, shots, &effect);
@@ -33,14 +34,14 @@ int main(void)
         p.x = door.x; p.y = door.y;
         Stage_Update(&stage, &p, &enemies, arrows, shots, &effect);
         assert(p.hp == 50 && p.bowCharges == 1);
-        if (level + 1 < STAGE_COUNT) {
-            assert(stage.index == level + 1 && !stage.completed);
+        if (Stage_Next(level) < STAGE_COUNT) {
+            assert(stage.index == Stage_Next(level) && !stage.completed);
             assert(!arrows[0].active && !shots[0].active);
         }
     }
-    assert(stage.completed && stage.index == STAGE_COUNT - 1);
+    assert(stage.completed && stage.index == STAGE_FINAL_ROOM);
     Stage_Update(&stage, &p, &enemies, arrows, shots, &effect);
-    assert(stage.index == STAGE_COUNT - 1);
+    assert(stage.index == STAGE_FINAL_ROOM);
     // Backtracking preserves partially damaged enemies and cleared rooms.
     stage = (StageProgress){0};
     Stage_Load(0, &p, &enemies, arrows, shots, &effect);
@@ -49,18 +50,18 @@ int main(void)
     SDL_FRect door = Stage_ExitBox(0);
     p.x = door.x; p.y = door.y;
     Stage_Update(&stage, &p, &enemies, arrows, shots, &effect);
-    assert(stage.index == 1);
+    assert(stage.index == STAGE_COFFIN_ROOM);
     Stage_Update(&stage, &p, &enemies, arrows, shots, &effect);
-    assert(stage.index == 1); // Arrival must not bounce back automatically.
-    enemies.ghouls[0].hp = 17;
-    door = Stage_BackBox(1);
+    assert(stage.index == STAGE_COFFIN_ROOM); // Arrival must not bounce back automatically.
+    enemies.coffin.hp = 17;
+    door = Stage_BackBox(STAGE_COFFIN_ROOM);
     p.x = door.x; p.y = door.y;
     Stage_Update(&stage, &p, &enemies, arrows, shots, &effect);
     assert(stage.index == 0 && Stage_EnemiesAlive(&enemies) == 0);
     door = Stage_ExitBox(0);
     p.x = door.x; p.y = door.y;
     Stage_Update(&stage, &p, &enemies, arrows, shots, &effect);
-    assert(stage.index == 1 && enemies.ghouls[0].hp == 17);
+    assert(stage.index == STAGE_COFFIN_ROOM && enemies.coffin.hp == 17);
     for (int side = STAGE_RIGHT; side <= STAGE_BOTTOM; ++side) {
         door = Stage_DoorBox((StageSide)side, 0.5f);
         Stage_PlaceAtDoor(&p, door, (StageSide)side);

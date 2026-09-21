@@ -7,6 +7,7 @@
 #include "assets/sprites/enemies/eye_parasite_sprites.h"
 #include <SDL3/SDL.h>
 #include "src/enemies/enemy_common.h"
+#include "src/effects/explosion_animation.h"
 #define EYE_PARASITE_BLAST_RADIUS 32.0f
 #define EYE_PARASITE_BLAST_SIZE (EYE_PARASITE_BLAST_RADIUS * 2.0f)
 #define EYE_PARASITE_TRIGGER_DISTANCE 25.0f
@@ -49,8 +50,8 @@ static inline void EyeParasite_TakeDamage(EyeParasite *e, int damage, float px, 
 static inline bool EyeParasite_BlastHitsPlayer(const EyeParasite *e, const Player *p)
 {
     float cx = e->x + ACTOR_HALF_SIZE, cy = e->y + ACTOR_HALF_SIZE;
-    float nearestX = fmaxf(p->x, fminf(cx, p->x + ACTOR_SIZE));
-    float nearestY = fmaxf(p->y, fminf(cy, p->y + ACTOR_SIZE));
+    float nearestX = fmaxf(p->x + PLAYER_HITBOX_OFFSET, fminf(cx, p->x + PLAYER_HITBOX_OFFSET + PLAYER_HITBOX_SIZE));
+    float nearestY = fmaxf(p->y + PLAYER_HITBOX_OFFSET, fminf(cy, p->y + PLAYER_HITBOX_OFFSET + PLAYER_HITBOX_SIZE));
     float dx = cx - nearestX, dy = cy - nearestY;
     return dx * dx + dy * dy <= EYE_PARASITE_BLAST_RADIUS * EYE_PARASITE_BLAST_RADIUS;
 }
@@ -72,7 +73,7 @@ static inline void EyeParasite_Update(EyeParasite *e, Player *p, float dt)
             if (EyeParasite_BlastHitsPlayer(e, p))
                 Enemy_HurtPlayer(p, e->attackDamage, e->x + ACTOR_HALF_SIZE, e->y + ACTOR_HALF_SIZE);
             e->hp = 0; e->state = EYE_PARASITE_DEAD; e->frame = 0; e->timer = 0;
-            e->explosionTimer = 0.25f;
+            e->explosionTimer = EYE_EXPLOSION_TIME;
         }
         return;
     }

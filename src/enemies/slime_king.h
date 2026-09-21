@@ -121,7 +121,7 @@ static inline void King_UpdateShot(KingShot *s, Player *p, float dt)
         float step = fmaxf(0, fminf(remaining, wallTime));
         float nx = s->x + s->vx * step, ny = s->y + s->vy * step;
         float x1 = s->x, y1 = s->y, x2 = nx, y2 = ny;
-        SDL_FRect box = {p->x - s->radius, p->y - s->radius, ACTOR_SIZE + s->radius * 2, ACTOR_SIZE + s->radius * 2};
+        SDL_FRect box = Player_ExpandedBody(p, s->radius, s->radius);
         if (p->hp > 0 && SDL_GetRectAndLineIntersectionFloat(&box, &x1, &y1, &x2, &y2)) {
             Enemy_HurtPlayer(p, s->damage, s->x - s->vx * 0.01f, s->y - s->vy * 0.01f);
             s->active = false;
@@ -151,8 +151,8 @@ static inline void King_StartSkill(SlimeKing *k, const Player *p, int skill)
 }
 static inline void King_SlamDamage(SlimeKing *k, Player *p)
 {
-    float dx = k->slamX - fmaxf(p->x, fminf(k->slamX, p->x + ACTOR_SIZE));
-    float dy = k->slamY - fmaxf(p->y, fminf(k->slamY, p->y + ACTOR_SIZE));
+    float dx = k->slamX - fmaxf(p->x + PLAYER_HITBOX_OFFSET, fminf(k->slamX, p->x + PLAYER_HITBOX_OFFSET + PLAYER_HITBOX_SIZE));
+    float dy = k->slamY - fmaxf(p->y + PLAYER_HITBOX_OFFSET, fminf(k->slamY, p->y + PLAYER_HITBOX_OFFSET + PLAYER_HITBOX_SIZE));
     if (dx * dx + dy * dy <= KING_SLAM_RADIUS * KING_SLAM_RADIUS)
         Enemy_HurtPlayer(p, KING_SLAM_DAMAGE, k->slamX, k->slamY);
     k->slamFlash = 0.2f;
@@ -165,8 +165,8 @@ static inline void King_ResolvePlayerCollision(const SlimeKing *k, Player *p)
     SDL_FRect b = King_Body(k);
     float dx = p->x + ACTOR_HALF_SIZE - (b.x + b.w / 2);
     float dy = p->y + ACTOR_HALF_SIZE - (b.y + b.h / 2);
-    float ox = (ACTOR_SIZE + b.w) / 2 - fabsf(dx);
-    float oy = (ACTOR_SIZE + b.h) / 2 - fabsf(dy);
+    float ox = (PLAYER_HITBOX_SIZE + b.w) / 2 - fabsf(dx);
+    float oy = (PLAYER_HITBOX_SIZE + b.h) / 2 - fabsf(dy);
     if (ox <= 0 || oy <= 0) return;
     if (ox < oy) p->x += dx < 0 ? -ox : ox;
     else p->y += dy < 0 ? -oy : oy;
@@ -225,7 +225,7 @@ static inline void King_Update(SlimeKing *k, Player *p, float dt)
         k->x += k->vx * dt; k->y += k->vy * dt; King_Clamp(k);
         SDL_FRect next = King_Body(k);
         float x2 = next.x + next.w / 2, y2 = next.y + next.h / 2;
-        SDL_FRect box = {p->x - b.w / 2, p->y - b.h / 2, ACTOR_SIZE + b.w, ACTOR_SIZE + b.h};
+        SDL_FRect box = Player_ExpandedBody(p, b.w / 2, b.h / 2);
         if (!k->dashHit && SDL_GetRectAndLineIntersectionFloat(&box, &x1, &y1, &x2, &y2)) {
             Enemy_HurtPlayer(p, KING_DASH_DAMAGE, b.x, b.y); k->dashHit = true;
         }

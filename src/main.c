@@ -15,6 +15,9 @@
 #include "src/player/bow_input.h"
 #include "src/effects/melee_slash.h"
 #include "src/ui/slime_king_draw.h"
+#include "src/ui/flesh_coffin_draw.h"
+#include "src/effects/parry_effect.h"
+#include "src/ui/room_objects_draw.h"
 
 typedef enum {
     GAME_MENU,      // หน้าก่อนเริ่มเกม
@@ -37,13 +40,13 @@ static void Draw_GameUI(SDL_Renderer *renderer, GameState state)
     const char *title = state == GAME_MENU ? "DOG ALIVE" :
                         state == GAME_PAUSED ? "PAUSED" : state == GAME_VICTORY ? "DUNGEON CLEARED" : "GAME OVER";
     const char *action = state == GAME_MENU ? "Enter: Start" :
-                         state == GAME_PAUSED ? "Esc: Resume" : "R: Restart";
+                         state == GAME_PAUSED ? "Esc: Resume" : state == GAME_OVER ? "Enter: Respawn" : "R: Restart";
     SDL_RenderDebugText(renderer, (GAME_WIDTH - strlen(title) * 8.0f) / 2, 88, title);
     SDL_RenderDebugText(renderer, (GAME_WIDTH - strlen(action) * 8.0f) / 2, 112, action);
     if (state == GAME_MENU) {
-        SDL_RenderDebugText(renderer, 32, 200, "5 STAGES - CLEAR TO EXIT");
+        SDL_RenderDebugText(renderer, 32, 200, "CHECKPOINTS - CLEAR TO EXIT");
         SDL_RenderDebugText(renderer, 48, 144, "WASD / Arrows: Move");
-        SDL_RenderDebugText(renderer, 48, 160, "Space: Slash  J: Shoot");
+        SDL_RenderDebugText(renderer, 16, 160, "Space: Interact/Slash  J: Shoot");
         SDL_RenderDebugText(renderer, 16, 176, "Tap J:Shot  Hold J:Arrow type");
     } else {
         SDL_RenderDebugText(renderer, 104, 136, "M: Main menu");
@@ -144,19 +147,16 @@ static void Draw_Projectiles(SDL_Renderer *renderer, SDL_Texture *const *texture
 
 static void Draw_ArrowEffects(SDL_Renderer *renderer, EnemyGroup *g)
 {
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 255, 150, 35, 140);
     for (int i = 0; i < MAX_PROJECTILES; ++i) {
         const ArrowExplosion *e = &g->explosions[i];
-        if (e->timer <= 0) continue;
-        for (int row = -(int)EXPLOSIVE_ARROW_RADIUS; row < (int)EXPLOSIVE_ARROW_RADIUS; ++row) {
-            float dy = row + 0.5f;
-            float half = sqrtf(EXPLOSIVE_ARROW_RADIUS * EXPLOSIVE_ARROW_RADIUS - dy * dy);
-            SDL_FRect span = {e->x - half, e->y + row, half * 2, 1};
-            SDL_RenderFillRect(renderer, &span);
-        }
+        int frame = Explosion_Frame(e->timer, arrow_explosion_8frames_dark_frames_duration_ms,
+            ARROW_EXPLOSION_8FRAMES_DARK_FRAMES_COUNT);
+        if (frame < 0) continue;
+        Draw_Sprite_Simulated(renderer, e->x - ARROW_EXPLOSION_8FRAMES_DARK_WIDTH / 2.0f,
+            e->y - ARROW_EXPLOSION_8FRAMES_DARK_HEIGHT / 2.0f,
+            ARROW_EXPLOSION_8FRAMES_DARK_WIDTH, ARROW_EXPLOSION_8FRAMES_DARK_HEIGHT,
+            arrow_explosion_8frames_dark_frames[frame], false, false, false, false);
     }
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
     EnemyTarget targets[ENEMY_TARGET_CAPACITY];
     int n = EnemyGroup_Targets(g, targets);
     for (int i = 0; i < n; ++i) {
@@ -264,6 +264,7 @@ int main(void)
                 running = false;
             }
             if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+                player.isCharging = false; player.chargeTimer = 0;
                 bowInput = (BowInput){0};
                 shootRequested = false;
             }
@@ -277,13 +278,19 @@ int main(void)
                 SDL_Scancode key = event.key.scancode;
                 if (gameState == GAME_PLAYING && player.hp > 0 && key == SDL_SCANCODE_J)
                     BowInput_Press(&bowInput, event.key.timestamp ? event.key.timestamp / 1000000 : SDL_GetTicks());
-                if ((gameState == GAME_MENU && key == SDL_SCANCODE_RETURN) ||
+                if (gameState == GAME_OVER && key == SDL_SCANCODE_RETURN) {
+                    Stage_Respawn(&stage, &player, &enemies, projectiles, slimeShots, &runningEffect);
+                    player.attackWasDown = SDL_GetKeyboardState(NULL)[SDL_SCANCODE_SPACE];
+                    bowInput = (BowInput){0}; shootRequested = false;
+                    gameState = GAME_PLAYING; deltaTime = 0;
+                } else if ((gameState == GAME_MENU && key == SDL_SCANCODE_RETURN) ||
                     (gameState != GAME_MENU && key == SDL_SCANCODE_R)) {
                     Reset_Game(&stage, &player, &enemies, projectiles, slimeShots, &runningEffect);
                     bowInput = (BowInput){0}; shootRequested = false;
                     gameState = GAME_PLAYING;
                     deltaTime = 0;
                 } else if (key == SDL_SCANCODE_ESCAPE) {
+                    player.isCharging = false; player.chargeTimer = 0;
                     bowInput = (BowInput){0}; shootRequested = false;
                     if (gameState == GAME_PLAYING) gameState = GAME_PAUSED;
                     else if (gameState == GAME_PAUSED) {
@@ -307,9 +314,15 @@ int main(void)
             player.collisionGraceTimer = fmaxf(0.0f, player.collisionGraceTimer - deltaTime);
             player.invincibilityTimer = fmaxf(0.0f, player.invincibilityTimer - deltaTime);
             player.hitFlashTimer = fmaxf(0.0f, player.hitFlashTimer - deltaTime);
+            player.parryEffectTimer = fmaxf(0.0f,player.parryEffectTimer-deltaTime);
+            Room_Update(&stage, &player, deltaTime);
             if (player.hp > 0)
             {
+                if (keyboardState[SDL_SCANCODE_SPACE] && !player.attackWasDown && Room_Interact(&stage, &player))
+                    player.attackWasDown = true; // Consume this press; holding Space cannot also slash.
+                float oldX = player.x, oldY = player.y;
                 Game_Update(&player, keyboardState, deltaTime);
+                Room_BlockMovement(&roomDefinitions[stage.index], &player, oldX, oldY);
                 Stage_ClampPlayer(&player);
                 SlimeShots_CheckPlayerAttack(slimeShots, &player);
                 EnemyGroup_Melee(&enemies, &player);
@@ -330,6 +343,7 @@ int main(void)
                 player.isMoving = false;
                 player.isSprinting = false;
                 player.isAttacking = false;
+                player.isCharging = false; player.chargeTimer = 0;
                 player.isShooting = false;
                 Update_PlayerDeath(&player, deltaTime);
             }
@@ -343,14 +357,24 @@ int main(void)
         SDL_SetWindowTitle(window, gameState == GAME_MENU ? "Dog Alive | Enter: Start" :
             gameState == GAME_PAUSED ? "Paused | Esc: Resume | R: Restart | M: Main menu" :
             gameState == GAME_VICTORY ? "Dungeon cleared | R: Restart | M: Main menu" :
-            gameState == GAME_OVER ? "Game over | R: Restart | M: Main menu" :
-            "WASD/Arrows: move/aim | Space: slash | Tap J: shoot | Hold J: arrow type | Esc: pause | R: restart");
+            gameState == GAME_OVER ? "Game over | Enter: Respawn | R: New run | M: Main menu" :
+            "WASD/Arrows: move/aim | Space: interact/slash | Tap J: shoot | Hold J: arrow type | Esc: pause | R: restart");
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
 
         if (gameState != GAME_MENU) {
             Stage_Draw(renderer, floorAtlas, &stage, &enemies);
+            Coffin_DrawGround(renderer,&enemies.coffin);
+            Room_Draw(renderer, &stage, &player);
+            if (player.isCharging) {
+                SDL_FRect charge = {player.x - 4, player.y - 6, 24, 3};
+                SDL_SetRenderDrawColor(renderer, 45, 45, 50, 255);
+                SDL_RenderFillRect(renderer, &charge);
+                charge.w *= player.chargeTimer / PLAYER_CHARGE_TIME;
+                SDL_SetRenderDrawColor(renderer, 255, player.chargeTimer >= PLAYER_CHARGE_TIME ? 240 : 130, 60, 255);
+                SDL_RenderFillRect(renderer, &charge);
+            }
             for (int i = 0; i < RUNNING_EFFECT_CAPACITY; ++i) {
                 const RunningPuff *puff = &runningEffect.puffs[i];
                 if (puff->active)
@@ -452,20 +476,9 @@ int main(void)
             }
             for (int enemyIndex = 0; enemyIndex < enemies.eyeCount; ++enemyIndex) {
             const EyeParasite eye = enemies.eyes[enemyIndex];
-            if (eye.state == EYE_PARASITE_ATTACK || eye.explosionTimer > 0) {
+            if (eye.state == EYE_PARASITE_ATTACK) {
                 float cx = eye.x + ACTOR_HALF_SIZE, cy = eye.y + ACTOR_HALF_SIZE;
                 float radius = EYE_PARASITE_BLAST_RADIUS;
-                if (eye.explosionTimer > 0) {
-                    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-                    SDL_SetRenderDrawColor(renderer, 255, 100, 40, 150);
-                    for (int row = -(int)radius; row < (int)radius; ++row) {
-                        float dy = row + 0.5f;
-                        float halfWidth = sqrtf(radius * radius - dy * dy);
-                        SDL_FRect span = {cx - halfWidth, cy + row, halfWidth * 2, 1};
-                        SDL_RenderFillRect(renderer, &span);
-                    }
-                    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-                }
                 SDL_SetRenderDrawColor(renderer, 255, 180, 60, 255);
                 SDL_FPoint ring[65];
                 for (int i = 0; i <= 64; ++i) {
@@ -479,6 +492,14 @@ int main(void)
                     EYE_PARASITE_BOMB_ENEMY_WIDTH, EYE_PARASITE_BOMB_ENEMY_HEIGHT,
                     EyeParasite_GetSprite(&eye), eye.direction == PLAYER_LEFT,
                     eye.hitFlashTimer > 0, false, false);
+            int burstFrame = Explosion_Frame(eye.explosionTimer, flesh_burst_frames_duration_ms,
+                FLESH_BURST_FRAMES_COUNT);
+            if (burstFrame >= 0)
+                Draw_Sprite_Simulated(renderer,
+                    eye.x + ACTOR_HALF_SIZE - FLESH_BURST_WIDTH / 2.0f,
+                    eye.y + ACTOR_HALF_SIZE - FLESH_BURST_HEIGHT / 2.0f,
+                    FLESH_BURST_WIDTH, FLESH_BURST_HEIGHT,
+                    flesh_burst_frames[burstFrame], false, false, false, false);
             }
             for (int i = 0; i < SLIME_SHOT_CAPACITY; ++i) {
                 const SlimeShot *s = &slimeShots[i];
@@ -490,7 +511,9 @@ int main(void)
             }
             Draw_Projectiles(renderer, arrowTexture, projectiles);
             King_Draw(renderer, &enemies.king);
+            Coffin_Draw(renderer, &enemies.coffin);
             MeleeSlash_Player(renderer, &player);
+            ParryEffect_Draw(renderer,&player);
             for (int i = 0; i < enemies.ghoulCount; ++i)
                 MeleeSlash_Ghoul(renderer, &enemies.ghouls[i]);
             Draw_ArrowEffects(renderer, &enemies);

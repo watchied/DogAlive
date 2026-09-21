@@ -1,8 +1,8 @@
 #ifndef SLIME_KING_CONFIG_H
 #define SLIME_KING_CONFIG_H
 // Distances and speeds use logical game pixels; times are seconds.
-#define KING_MAX_HP 300
-#define KING_PHASE_TWO_RATIO 0.5f
+#define KING_MAX_HP 500
+#define KING_PHASE_TWO_RATIO 0.55f
 #define KING_MOVE_SPEED 12.0f
 #define KING_ATTACK_REST 2.0f
 #define KING_PHASE_TWO_REST 0.85f
@@ -26,15 +26,15 @@
 #define KING_DASH_WINDUP 0.75f
 #define KING_DASH_TIME 0.7f
 #define KING_SLAM_DAMAGE 25
-#define KING_SLAM_RADIUS 25.0f
+#define KING_SLAM_RADIUS 25.5f
 #define KING_SLAM_MIN 2
 #define KING_SLAM_MAX 5
 #define KING_BURROW_TIME 0.8f
-#define KING_SLAM_WARNING 0.62f
+#define KING_SLAM_WARNING 0.65f
 #define KING_SLAM_FALL_TIME 0.23f
 #define KING_SLAM_HEIGHT 100.0f
 #define KING_SLAM_RECOVERY 0.35f
-#define KING_LASER_DAMAGE 12
+#define KING_LASER_DAMAGE 14
 #define KING_LASER_SPEED 115.0f
 #define KING_LASER_RADIUS 3.0f
 #define KING_LASER_BOUNCES 2
@@ -44,7 +44,7 @@
 #define KING_SPIRAL_INTERVAL 0.12f
 #define KING_SPIRAL_WINDUP 0.7f
 #define KING_SPIRAL_BOUNCES 2
-#define KING_BEAM_CHARGE_TIME 2.0f
+#define KING_BEAM_CHARGE_TIME 2.3f
 #define KING_BEAM_DAMAGE 45
 #define KING_BEAM_SPEED 1000.0f
 #define KING_BEAM_RADIUS 7.0f
