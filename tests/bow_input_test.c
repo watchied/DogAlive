@@ -23,7 +23,10 @@ int main(void)
     assert(p.arrowType == ARROW_EXPLOSIVE);
     BowInput_Press(&input, 7000);
     assert(!BowInput_Release(&input, &p, 7500));
-    assert(p.arrowType == ARROW_NORMAL);
+    assert(p.potionSelected);
+    BowInput_Press(&input, 7600);
+    assert(!BowInput_Release(&input, &p, 8050));
+    assert(!p.potionSelected && p.arrowType == ARROW_NORMAL);
     BowInput_Press(&input, 8000);
     input = (BowInput){0}; // Pause/focus loss cancels the pending tap.
     assert(!BowInput_Release(&input, &p, 8100));

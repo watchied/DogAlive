@@ -6,7 +6,7 @@ The boss waits in the upper-right corner on opening1 frame 1. Approaching within
 
 ## Phase 1
 
-Boss HP is 1000. The three deployed swords share a separate 400 HP pool. Melee, arrows, explosion damage and fire burns can damage the deployed swords. Damaging them never subtracts boss HP. The smaller lower bar shows their shared HP.
+Boss HP is 1000. The three deployed swords share a separate 400 HP pool. Melee, arrows, explosion damage and fire burns can damage the deployed swords. Damaging them never subtracts boss HP. During phase 1, all damage hitting the boss is redirected to the sword pool while it has HP, including reflected projectiles and fire burns. The hit that breaks the swords does not spill into boss HP; subsequent hits damage the boss normally. The smaller lower bar and SWORDS current / maximum label show their shared HP throughout phase 1.
 
 During phase 1, the boss walks towards the player during idle rest windows and while detached swords are executing skills (Ground Pin, Targeted Stabs, Wall Split), stopping when within melee range (36 pixels). When walking with swords attached to its back, it animates using `flesh_coffin_wak_sword`; when swords are deployed or destroyed, it animates using `flesh_coffin_wak_nosword`.
 
@@ -33,6 +33,12 @@ Phase-2 sword slashes can be parried by normal or charged player slashes. A parr
 
 ## Tuning and assets
 
+Charged slashes use their own `COFFIN_CHARGED_REACH` (96) and `COFFIN_CHARGED_WIDTH` (64). Their damage, effect and parry overlap all use this area. Normal slash dimensions remain separate. Phase-two slashes, teleport-slash preparation, and slam landing areas are shown in translucent red on the ground.
+
+Teleport Strikes now pause in the phase-two idle pose after reappearing. `COFFIN_TELEPORT_SLASH_PAUSE` controls this pause (0.6 seconds); the boss holds its position and facing before starting the slash. Stun holds frame 2 of the stun animation throughout the stun window. Charged slashes use `assets/sprites/effects/charge-slash.h`, resampled to the configured slash size, with the peak effect aligned to the damage time.
+
+The dash locks its destination at attack start and ends there. It leaves damaging blood dust every `COFFIN_DASH_DUST_SPACING` pixels. The delayed trail flash is drawn as a line rather than repeated copies of the boss sprite.
+
 Portal/teleport animations play before the drop. Falling and landing recovery use the idle sprite of the current phase (with/without swords in phase 1). Blood dust is drawn on the floor beneath the actors using `blood_dust.h`. Adjust `COFFIN_DUST_COUNT`, `COFFIN_DUST_LIFETIME`, `COFFIN_DUST_RADIUS`, `COFFIN_DUST_DAMAGE`, and `COFFIN_DUST_TICK_TIME` in the boss config.
 
 All balance values are in `src/enemies/flesh_coffin_config.h`: HP, phase ratio, activation distance, animation durations, projectile speed/damage/lifetime, wave/stab counts, telegraph windows, dash/trail parameters, slash geometry and damage, teleport distance/count, charge and stun durations. Use positive durations and valid count ranges. Sprite selection is in `src/ui/flesh_coffin_draw.h`; behavior is in `src/enemies/flesh_coffin.h`.
@@ -40,3 +46,9 @@ All balance values are in `src/enemies/flesh_coffin_config.h`: HP, phase ratio, 
 The main sprite sheet is `assets/sprites/enemies/flesh coffin(boss).h`. Swords and mini blades use `blood_spellblade.h` and `mini_blood_spellblade.h`. Room placement is controlled by `STAGE_COFFIN_ROOM`, `Stage_Next`, `Stage_Previous`, `Stage_BackSide` and `Stage_Load` in `src/core/stages.h`.
 
 Run `run_game.cmd` after editing settings. The dedicated regression test is `tests/flesh_coffin_test.c`; compile it with the same include/library flags as the other SDL tests.
+
+## Orbit and close slash tuning
+
+Phase 1 can release three swords into an evenly spaced orbit for 5 seconds, dealing contact damage before returning. Tune COFFIN_ORBIT_RADIUS, COFFIN_ORBIT_TIME, COFFIN_ORBIT_SPEED and COFFIN_ORBIT_DAMAGE. While swords are deployed or destroyed, walking stops at COFFIN_UNARMED_STOP_DISTANCE (88 pixels); attached swords use COFFIN_WALK_STOP_DISTANCE (36).
+
+In phase 2, an idle boss within slash reach chooses a stationary frontal slash. Its windup lasts COFFIN_CLOSE_SLASH_HIT_TIME (1 second), with total duration COFFIN_CLOSE_SLASH_TIME. Teleport slashes retain their timing. All seven animation frames play; COFFIN_SLASH_HIT_FRAME selects the zero-based impact frame (5). The slash effect uses the same impact timing.

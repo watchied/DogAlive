@@ -4,6 +4,7 @@
 #include "assets/sprites/projectiles/king_slime_bubble.h"
 #include "assets/sprites/projectiles/king_slime_laser.h"
 #include "assets/sprites/projectiles/king_slime_beam.h"
+#include "assets/sprites/effects/slime-king-slam.h"
 
 static inline int King_VisualFrame(float time, float duration, int count)
 {
@@ -74,7 +75,7 @@ static inline void King_Draw(SDL_Renderer *r, const SlimeKing *k)
     if (!k->active) return;
     SDL_FRect b = King_Body(k);
     float cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-    if (k->state == KING_SLAM_MARK || k->state == KING_SLAM_FALL || k->slamFlash > 0) {
+    if (k->state == KING_SLAM_MARK || k->state == KING_SLAM_FALL) {
         SDL_SetRenderDrawColor(r, 255, k->slamFlash > 0 ? 240 : 80, 40, 255);
         King_DrawCircle(r, k->slamX, k->slamY, KING_SLAM_RADIUS);
         SDL_RenderLine(r, k->slamX - 4, k->slamY, k->slamX + 4, k->slamY);
@@ -83,6 +84,12 @@ static inline void King_Draw(SDL_Renderer *r, const SlimeKing *k)
     if (k->state == KING_DASH_READY || k->state == KING_BEAM_CHARGE) {
         SDL_SetRenderDrawColor(r, 255, k->state == KING_BEAM_CHARGE ? 50 : 180, 50, 255);
         SDL_RenderLine(r, cx, cy, cx + k->aimX * GAME_WIDTH, cy + k->aimY * GAME_WIDTH);
+    }
+    if (k->slamFlash > 0) {
+        int frame=King_VisualFrame(KING_SLAM_EFFECT_TIME-k->slamFlash,
+            KING_SLAM_EFFECT_TIME,SLIME_KING_SLAM_FRAMES_COUNT);
+        King_DrawPixels(r,k->slamX,k->slamY+KING_SLAM_EFFECT_OFFSET_Y,slime_king_slam_frames[frame],
+            SLIME_KING_SLAM_WIDTH,SLIME_KING_SLAM_HEIGHT,0,false);
     }
     if (k->state == KING_NPC) {
         King_DrawPixels(r, k->x + 24, k->y + 32, slime_king_npc_frames[0], SLIME_KING_NPC_WIDTH, SLIME_KING_NPC_HEIGHT, 0, false);

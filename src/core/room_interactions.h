@@ -81,6 +81,7 @@ static inline void Stage_Respawn(StageProgress *s, Player *p, EnemyGroup *enemie
     p->speed = previous.speed; p->arrowSpeed = previous.arrowSpeed;
     p->shootCooldown = previous.shootCooldown; p->arrowLifetime = previous.arrowLifetime;
     p->unlockedArrows = previous.unlockedArrows; p->arrowType = previous.arrowType;
+    p->healingPotions=previous.healingPotions;p->potionSelected=previous.potionSelected;
     p->bowCharges = p->unlockedArrows ? PLAYER_BOW_MAX_CHARGES : 0;
     p->invincibilityTimer = PLAYER_INVINCIBILITY_TIME;
     s->completed = false;

@@ -155,7 +155,7 @@ static inline void King_SlamDamage(SlimeKing *k, Player *p)
     float dy = k->slamY - fmaxf(p->y + PLAYER_HITBOX_OFFSET, fminf(k->slamY, p->y + PLAYER_HITBOX_OFFSET + PLAYER_HITBOX_SIZE));
     if (dx * dx + dy * dy <= KING_SLAM_RADIUS * KING_SLAM_RADIUS)
         Enemy_HurtPlayer(p, KING_SLAM_DAMAGE, k->slamX, k->slamY);
-    k->slamFlash = 0.2f;
+    k->slamFlash = KING_SLAM_EFFECT_TIME;
 }
 static inline void King_ResolvePlayerCollision(const SlimeKing *k, Player *p)
 {

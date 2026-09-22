@@ -87,7 +87,7 @@ int main(void)
     assert(Room_Interact(&s, &p) && Player_HasArrow(&p, ARROW_FIRE));
     assert(!Player_HasArrow(&p, ARROW_EXPLOSIVE));
     input = (BowInput){0}; BowInput_Press(&input, 0); BowInput_Update(&input, &p, 500);
-    assert(p.arrowType == ARROW_NORMAL); // Skip locked explosive arrows.
+    assert(p.potionSelected); // Skip locked explosive arrows and select the potion.
     p.x = 212; p.y = 87; p.invincibilityTimer = 100;
     assert(Room_Interact(&s, &p));
     Room_Update(&s, &p, 1);

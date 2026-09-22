@@ -112,15 +112,18 @@ static inline void HUD_Draw(SDL_Renderer *renderer, const Player *p)
         STAMINA_UI_WIDTH, p->maxStamina > 0 ? p->stamina / p->maxStamina : 0,
         stamina_bar_frames, STAMINA_BAR_WIDTH, STAMINA_BAR_HEIGHT,
         stamina_frames, STAMINA_WIDTH, STAMINA_HEIGHT, 0, 2);
-    if (!p->unlockedArrows) return;
     float ready = p->shootCooldown > 0 ? 1 - p->shootTimer / p->shootCooldown : 1;
     float bowY = stamina.y + stamina.h + 4;
-    for (int i = 0; i < PLAYER_BOW_MAX_CHARGES; ++i)
+    if(p->potionSelected) {
+        SDL_SetRenderDrawColor(renderer,230,240,230,255);
+        SDL_RenderDebugTextFormat(renderer,hp.x,bowY,"x%d",p->healingPotions);
+    }
+    for (int i = 0; !p->potionSelected && i < PLAYER_BOW_MAX_CHARGES; ++i)
         HUD_DrawArtBar(renderer, hp.x + i * (BOW_UI_WIDTH + 2), bowY, BOW_UI_WIDTH,
         i < p->bowCharges ? 1 : i == p->bowCharges ? ready : 0,
         bow_bar_frames, BOW_BAR_WIDTH, BOW_BAR_HEIGHT,
         bow_charge_frames, BOW_CHARGE_WIDTH, BOW_CHARGE_HEIGHT, 1, 0);
-    const uint16_t *icon = p->arrowType == ARROW_FIRE ? crossbow_icon_fire_crossbow[0] :
+    const uint16_t *icon = p->potionSelected ? crossbow_icon_potion[0] : p->arrowType == ARROW_FIRE ? crossbow_icon_fire_crossbow[0] :
         p->arrowType == ARROW_EXPLOSIVE ? crossbow_icon_bomb_crossbow[0] : crossbow_icon_crossbow[0];
     for (int y = 0; y < CROSSBOW_ICON_HEIGHT; ++y)
         for (int x = 0; x < CROSSBOW_ICON_WIDTH; ++x)

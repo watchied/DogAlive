@@ -37,7 +37,7 @@ void Game_Update(Player *player, const bool *keyboardState, float deltaTime)
         unsigned int bit = 1u << i;
         player->tapRemaining[i] = fmaxf(0.0f, player->tapRemaining[i] - deltaTime);
         if (down[i]) held |= bit;
-        if (actionBusy) {
+        if (actionBusy || player->potionUseTimer > 0) {
             player->tapRemaining[i] = 0.0f;
         } else if (down[i] && !(player->moveWasDown & bit)) {
             if (player->tapRemaining[i] > 0.0f &&
@@ -51,7 +51,7 @@ void Game_Update(Player *player, const bool *keyboardState, float deltaTime)
         }
     }
     player->moveWasDown = held;
-    if (actionBusy || !(held & player->sprintButton) || player->stamina <= 0.0f)
+    if (actionBusy || player->potionUseTimer > 0 || !(held & player->sprintButton) || player->stamina <= 0.0f)
         player->isSprinting = false;
 
     float moveMultiplier = 1.0f;
@@ -146,6 +146,8 @@ void Game_Update(Player *player, const bool *keyboardState, float deltaTime)
     float diagonalScale = (dx != 0 && dy != 0) ? 0.70710678f : 1.0f;
     if (player->isCharging || (player->isAttacking && player->chargedAttack))
         moveMultiplier = PLAYER_CHARGE_MOVE_MULTIPLIER;
+    if (player->potionUseTimer > 0)
+        moveMultiplier = fminf(moveMultiplier, PLAYER_POTION_MOVE_MULTIPLIER);
     player->x += dx * diagonalScale * player->speed * moveMultiplier * deltaTime;
     player->y += dy * diagonalScale * player->speed * moveMultiplier * deltaTime;
 

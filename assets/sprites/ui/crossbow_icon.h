@@ -42,14 +42,26 @@ static const uint16_t crossbow_icon_bomb_crossbow_1[] = {
     0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0,
 };
 
-#define CROSSBOW_ICON_FRAMES_COUNT 3
+/* Timeline frame 4 */
+static const uint16_t crossbow_icon_potion_1[] = {
+    0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0,
+    0x9A22, 0x99A0, 0x8980, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x76FC, 0x07E0,
+    0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x8F5E, 0x76FC, 0x76FC, 0x07E0, 0x07E0, 0x07E0,
+    0x07E0, 0x07E0, 0xA79F, 0xE000, 0xE000, 0xE000, 0x667A, 0x07E0, 0x07E0, 0x07E0, 0x979F, 0xC800,
+    0xD000, 0xE000, 0xFFFF, 0xC800, 0x465A, 0x07E0, 0x07E0, 0x07E0, 0x873D, 0xC800, 0xD000, 0xC800,
+    0x465A, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x76DC, 0xC800, 0x465A, 0x07E0, 0x07E0, 0x07E0,
+    0x07E0, 0x07E0, 0x07E0, 0x07E0, 0x5EBB, 0x07E0, 0x07E0, 0x07E0, 0x07E0,
+};
+
+#define CROSSBOW_ICON_FRAMES_COUNT 4
 static const uint16_t * const crossbow_icon_frames[] = {
     crossbow_icon_crossbow_1,
     crossbow_icon_fire_crossbow_1,
     crossbow_icon_bomb_crossbow_1,
+    crossbow_icon_potion_1,
 };
-static const uint32_t crossbow_icon_frames_duration_ms[] = { 100, 100, 100 };
-static const uint32_t crossbow_icon_frames_source_frames[] = { 1, 2, 3 };
+static const uint32_t crossbow_icon_frames_duration_ms[] = { 100, 100, 100, 100 };
+static const uint32_t crossbow_icon_frames_source_frames[] = { 1, 2, 3, 4 };
 
 #define CROSSBOW_ICON_CROSSBOW_COUNT 1
 static const uint16_t * const crossbow_icon_crossbow[] = {
@@ -71,5 +83,12 @@ static const uint16_t * const crossbow_icon_bomb_crossbow[] = {
 };
 static const uint32_t crossbow_icon_bomb_crossbow_duration_ms[] = { 100 };
 static const uint32_t crossbow_icon_bomb_crossbow_source_frames[] = { 3 };
+
+#define CROSSBOW_ICON_POTION_COUNT 1
+static const uint16_t * const crossbow_icon_potion[] = {
+    crossbow_icon_potion_1,
+};
+static const uint32_t crossbow_icon_potion_duration_ms[] = { 100 };
+static const uint32_t crossbow_icon_potion_source_frames[] = { 4 };
 
 #endif /* CROSSBOW_ICON_RGB565_H */

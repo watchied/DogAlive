@@ -12,9 +12,11 @@ static inline void BowInput_Press(BowInput *input, uint64_t now)
 static inline void BowInput_Update(BowInput *input, Player *p, uint64_t now)
 {
     if (input->down && !input->switched && now - input->pressedAt >= BOW_TYPE_HOLD_MS) {
-        for (int step = 1; step <= 3; ++step) {
-            ArrowType next = (ArrowType)(((int)p->arrowType + step) % 3);
-            if (Player_HasArrow(p, next)) { p->arrowType = next; break; }
+        int current = p->potionSelected ? 3 : (int)p->arrowType;
+        for (int step = 1; step <= 4; ++step) {
+            int next = (current + step) % 4;
+            if(next==3) { p->potionSelected=true;break; }
+            if (Player_HasArrow(p, (ArrowType)next)) { p->arrowType = (ArrowType)next;p->potionSelected=false;break; }
         }
         input->switched = true;
     }

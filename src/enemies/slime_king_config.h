@@ -25,6 +25,8 @@
 #define KING_DASH_SPEED 250.0f
 #define KING_DASH_WINDUP 0.75f
 #define KING_DASH_TIME 0.7f
+#define KING_SLAM_EFFECT_OFFSET_Y (KING_BODY_HEIGHT / 2.0f)
+#define KING_SLAM_EFFECT_TIME 0.56f // Eight frames, 70 ms each.
 #define KING_SLAM_DAMAGE 25
 #define KING_SLAM_RADIUS 25.5f
 #define KING_SLAM_MIN 2

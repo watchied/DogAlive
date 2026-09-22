@@ -2,22 +2,34 @@
 #define PARRY_EFFECT_H
 #include "src/player/player.h"
 #include <math.h>
+#include "assets/sprites/effects/hit-spark.h"
 
 static inline void ParryEffect_Draw(SDL_Renderer *r,const Player *p)
 {
     if(p->parryEffectTimer<=0) return;
     float progress=1-p->parryEffectTimer/PLAYER_PARRY_EFFECT_TIME;
     float cx=p->parryEffectX,cy=p->parryEffectY;
-    // Gold burst is distinct from the white damage flash. Fixed impact position.
-    SDL_SetRenderDrawColor(r,255,220,80,255);
-    if(progress<0.65f) for(int i=0;i<8;++i) {
-        float a=i*0.78539816339f,near=3+progress*12,far=10+progress*22;
-        SDL_RenderLine(r,cx+cosf(a)*near,cy+sinf(a)*near,cx+cosf(a)*far,cy+sinf(a)*far);
-        SDL_FRect spark={cx+cosf(a)*far-1,cy+sinf(a)*far-1,2,2};SDL_RenderFillRect(r,&spark);
+    // Play once at the fixed midpoint recorded when the parry succeeds.
+    float elapsed=PLAYER_PARRY_EFFECT_TIME-p->parryEffectTimer;
+    int frame=0;
+    while(frame<HIT_SPARK_FRAMES_COUNT) {
+        float duration=hit_spark_frames_duration_ms[frame]/1000.0f;
+        if(elapsed<duration) break;
+        elapsed-=duration;
+        ++frame;
     }
-    if(progress<0.2f) {
-        SDL_SetRenderDrawColor(r,255,255,255,255);
-        SDL_FRect flash={cx-3,cy-3,6,6};SDL_RenderFillRect(r,&flash);
+    if(frame<HIT_SPARK_FRAMES_COUNT) {
+        const uint16_t *pixels=hit_spark_frames[frame];
+        for(int py=0;py<HIT_SPARK_HEIGHT;++py)
+            for(int px=0;px<HIT_SPARK_WIDTH;++px) {
+                uint16_t color=pixels[py*HIT_SPARK_WIDTH+px];
+                if(color==0x07E0) continue;
+                SDL_SetRenderDrawColor(r,((color>>11)&31)*255/31,
+                    ((color>>5)&63)*255/63,(color&31)*255/31,255);
+                SDL_FRect pixel={cx-HIT_SPARK_WIDTH/2.0f+px,
+                    cy-HIT_SPARK_HEIGHT/2.0f+py,1,1};
+                SDL_RenderFillRect(r,&pixel);
+            }
     }
     float x=fmaxf(2,fminf(GAME_WIDTH-44,cx-20));
     float y=fmaxf(2,fminf(GAME_HEIGHT-12,cy-23-progress*10));

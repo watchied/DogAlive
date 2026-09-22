@@ -5,14 +5,26 @@
 #define COFFIN_SWORDS_HP 400
 #define COFFIN_PHASE_RATIO 0.75f
 #define COFFIN_TRIGGER_RADIUS 85.0f
-#define COFFIN_INTRO_TIME 1.1f
-#define COFFIN_TRANSITION_TIME 8.4f
-#define COFFIN_DEATH_TIME 1.5f
-#define COFFIN_REST_TIME 1.8f
+#define COFFIN_INTRO_TIME 5.0f
+#define COFFIN_TRANSITION_TIME 7.0f
+#define COFFIN_DEATH_TIME 5.0f
+#define COFFIN_REST_TIME 1.5f
 #define COFFIN_WALK_SPEED 28.0f
+#define COFFIN_SLASH_MOVE_MULTIPLIER 0.5f
+#define COFFIN_WALK_STOP_DISTANCE 36.0f
+#define COFFIN_UNARMED_STOP_DISTANCE 88.0f
+#define COFFIN_ORBIT_RADIUS 52.0f
+#define COFFIN_ORBIT_TIME 5.0f
+#define COFFIN_ORBIT_SPEED 2.5f // Radians per second.
+#define COFFIN_ORBIT_DAMAGE 18
+#define COFFIN_CLOSE_SLASH_HIT_TIME 1.0f
+#define COFFIN_CLOSE_SLASH_TIME 1.9f
+#define COFFIN_SLASH_HIT_FRAME 5
 #define COFFIN_EYE_TIME 0.9f
 #define COFFIN_RELEASE_TIME 0.9f
 #define COFFIN_RETURN_TIME 0.6f
+#define COFFIN_BODY_OFFSET_X 0.0f // Positive moves the body hitbox right.
+#define COFFIN_BODY_OFFSET_Y 10.0f // Positive moves the body hitbox down.
 #define COFFIN_BODY_WIDTH 28.0f
 #define COFFIN_BODY_HEIGHT 40.0f
 #define COFFIN_SHOT_CAPACITY 128
@@ -23,16 +35,22 @@
 #define COFFIN_GROUND_WAVES 3
 #define COFFIN_GROUND_RAYS 8
 #define COFFIN_GROUND_INTERVAL 0.8f
+#define COFFIN_CLOSE_SLASH_CHANCE 30 // Percent of nearby phase-two skill choices.
+#define COFFIN_STAB_START_DISTANCE 80.0f
+#define COFFIN_STAB_PASS_DISTANCE 30.0f
 #define COFFIN_STAB_COUNT 9
-#define COFFIN_STAB_WARNING 0.45f
+#define COFFIN_STAB_WARNING 0.65f
 #define COFFIN_STAB_TRAVEL 0.3f
-#define COFFIN_STAB_DAMAGE 22
+#define COFFIN_STAB_DAMAGE 17
 #define COFFIN_WALL_WARNING 0.8f
 #define COFFIN_WALL_RAYS 3 // Mini blades per sword/edge; three distinct edges.
 #define COFFIN_WALL_MARGIN 20.0f
 #define COFFIN_PORTAL_TIME 0.9f
 #define COFFIN_SLAM_FALL_TIME 0.8f
 #define COFFIN_SLAM_RECOVERY 0.65f
+#define COFFIN_SLAM_CENTER_X -8.0f // Leg midpoint is at sprite x=24 on the 64-pixel canvas.
+#define COFFIN_SLAM_CENTER_Y 20.0f // Midpoint between the legs, relative to sprite center.
+#define COFFIN_SLAM_EFFECT_TIME 0.56f
 #define COFFIN_SLAM_RADIUS 25.0f
 #define COFFIN_SLAM_DAMAGE 30
 #define COFFIN_SLAM_RAYS 9
@@ -57,12 +75,15 @@
 #define COFFIN_SLASH_PARRY_START 0.25f
 #define COFFIN_SLASH_DAMAGE 25
 #define COFFIN_TELEPORT_TIME 1.0f
+#define COFFIN_TELEPORT_SLASH_PAUSE 0.6f // Stand still after reappearing, before swinging.
 #define COFFIN_TELEPORT_DISTANCE 44.0f
-#define COFFIN_STRIKES_MIN 1
-#define COFFIN_STRIKES_MAX 3
+#define COFFIN_STRIKES_MIN 2
+#define COFFIN_STRIKES_MAX 4
 #define COFFIN_CHARGE_TIME 3.5f
 #define COFFIN_CHARGED_SLASH_TIME 1.2f
 #define COFFIN_CHARGED_HIT_TIME 0.8f
 #define COFFIN_CHARGED_DAMAGE 40
+#define COFFIN_CHARGED_REACH 96.0f
+#define COFFIN_CHARGED_WIDTH 64.0f
 #define COFFIN_STUN_TIME 3.5f
 #endif

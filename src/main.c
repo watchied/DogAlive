@@ -322,6 +322,7 @@ int main(void)
                     player.attackWasDown = true; // Consume this press; holding Space cannot also slash.
                 float oldX = player.x, oldY = player.y;
                 Game_Update(&player, keyboardState, deltaTime);
+                Player_UpdatePotion(&player, deltaTime);
                 Room_BlockMovement(&roomDefinitions[stage.index], &player, oldX, oldY);
                 Stage_ClampPlayer(&player);
                 SlimeShots_CheckPlayerAttack(slimeShots, &player);
@@ -332,7 +333,8 @@ int main(void)
                 Projectiles_UpdateShooting(projectiles, &player, deltaTime);
                 if ((SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS) &&
                     shootRequested) {
-                    Projectiles_Shoot(projectiles, &player);
+                    if(player.potionSelected) Player_UsePotion(&player);
+                    else Projectiles_Shoot(projectiles, &player);
                 }
             }
             EnemyGroup_Update(&enemies, &player, slimeShots, deltaTime);
@@ -345,6 +347,7 @@ int main(void)
                 player.isAttacking = false;
                 player.isCharging = false; player.chargeTimer = 0;
                 player.isShooting = false;
+                player.potionUseTimer = 0;
                 Update_PlayerDeath(&player, deltaTime);
             }
             RunningEffect_Update(&runningEffect, &player, deltaTime);

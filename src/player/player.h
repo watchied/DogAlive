@@ -14,9 +14,13 @@
 #define PLAYER_START_EXPLOSIVE_ARROW 0
 #define PLAYER_START_ENCHANT_BLADE 1
 #define PLAYER_DEFAULT_SPEED 40.0f
-#define PLAYER_MAX_HP 150
+#define PLAYER_MAX_HP 900
 #define PLAYER_HITBOX_SIZE 13.0f
 #define PLAYER_HITBOX_OFFSET ((ACTOR_SIZE - PLAYER_HITBOX_SIZE) / 2.0f)
+#define PLAYER_START_POTIONS 2
+#define PLAYER_POTION_HEAL 60
+#define PLAYER_POTION_USE_TIME 2.0f
+#define PLAYER_POTION_MOVE_MULTIPLIER 0.7f
 #define PLAYER_COLLISION_GRACE_TIME 0.5f
 #define PLAYER_HIT_FLASH_TIME 0.16f
 #define PLAYER_INVINCIBILITY_TIME 0.3f
@@ -28,9 +32,9 @@
 #define PLAYER_STAMINA_REGEN 30.0f
 #define PLAYER_SPRINT_MIN_STAMINA 20.0f
 #define PLAYER_DOUBLE_TAP_TIME 0.25f
-#define PLAYER_ATTACK_DAMAGE 40
+#define PLAYER_ATTACK_DAMAGE 400
 #define PLAYER_MELEE_STAMINA_COST 15.0f // Stamina spent once when starting a slash.
-#define PLAYER_CHARGE_TIME 2.5f
+#define PLAYER_CHARGE_TIME 1.5f
 #define PLAYER_CHARGE_REACH 64.0f // Forward distance from the player's center.
 #define PLAYER_CHARGE_WIDTH 80.0f // Width perpendicular to the facing direction.
 #define PLAYER_CHARGE_MOVE_MULTIPLIER 0.7f
@@ -94,6 +98,9 @@ typedef struct
     float arrowLifetime;
     float shootTimer;
     int bowCharges;
+    int healingPotions;
+    float potionUseTimer;
+    bool potionSelected;
     unsigned int unlockedArrows; // One bit per ArrowType; a new run starts without a bow.
     ArrowType arrowType;
     ArrowType shootingArrowType; // Snapshot so switching cannot change an already paid shot.
@@ -181,6 +188,8 @@ static inline void Player_Init(Player *player)
         .arrowSpeed = PLAYER_ARROW_SPEED,
         .shootCooldown = PLAYER_SHOOT_COOLDOWN,
         .bowCharges = 0,
+        .healingPotions = PLAYER_START_POTIONS,
+        .potionSelected = true,
         .arrowLifetime = PLAYER_ARROW_LIFETIME,
         .aimX = 1.0f,
         .aimY = 0.0f,
@@ -190,6 +199,7 @@ static inline void Player_Init(Player *player)
         (PLAYER_START_EXPLOSIVE_ARROW ? 1u << ARROW_EXPLOSIVE : 0);
     player->enchantBlade = PLAYER_START_ENCHANT_BLADE != 0;
     if (player->unlockedArrows) {
+        player->potionSelected = false;
         player->bowCharges = PLAYER_BOW_MAX_CHARGES;
         // Select the first owned type, even when normal arrows are disabled.
         for (int type = ARROW_NORMAL; type <= ARROW_EXPLOSIVE; ++type)
@@ -220,8 +230,29 @@ static inline void Player_UnlockArrow(Player *p, ArrowType type)
     if (Player_HasArrow(p, type)) return;
     p->unlockedArrows |= 1u << type;
     p->arrowType = type;
+    p->potionSelected = false;
     p->bowCharges = PLAYER_BOW_MAX_CHARGES;
     p->shootTimer = 0;
+}
+
+static inline bool Player_UsePotion(Player *p)
+{
+    if(p->hp<=0 || p->hp>=p->maxHP || p->healingPotions<=0 || p->potionUseTimer>0 || p->isAttacking || p->isCharging || p->isShooting) return false;
+    --p->healingPotions;
+    p->potionUseTimer = PLAYER_POTION_USE_TIME;
+    p->isSprinting = false;
+    return true;
+}
+
+static inline void Player_UpdatePotion(Player *p, float dt)
+{
+    if (p->hp <= 0) { p->potionUseTimer = 0; return; }
+    if (p->potionUseTimer <= 0 || dt <= 0) return;
+    p->potionUseTimer -= dt;
+    if (p->potionUseTimer <= 0) {
+        p->potionUseTimer = 0;
+        p->hp = p->maxHP-p->hp < PLAYER_POTION_HEAL ? p->maxHP : p->hp+PLAYER_POTION_HEAL;
+    }
 }
 
 #endif

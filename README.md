@@ -10,6 +10,8 @@ game for microcontroler project
 
 ## controls
 
+- Start with 2 healing potions. Hold J to cycle through unlocked arrows and the potion; tap J to use the selected item. Drinking takes 2 seconds: movement is reduced to 70% and sprinting is disabled, then 50 HP is restored (capped at max HP). Pausing freezes the timer; dying cancels the pending heal. Full HP does not consume a potion. Remaining potions persist on checkpoint respawn; a new run restores the starting count. Tune `PLAYER_START_POTIONS`, `PLAYER_POTION_HEAL`, `PLAYER_POTION_USE_TIME`, and `PLAYER_POTION_MOVE_MULTIPLIER` in `src/player/player.h`.
+
 - w a s d to move and double tap to run(can not run and turn back to run)
 - press spacebar near a checkpoint/chest to interact; elsewhere it attacks
 - j to fire arrow and hold j to change arrow type
