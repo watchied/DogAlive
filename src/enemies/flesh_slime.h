@@ -11,6 +11,7 @@
 #include <SDL3/SDL.h>
 #include "src/enemies/enemy_common.h"
 #include "assets/sprites/projectiles/slime_bullet.h"
+#include "assets/sprites/enemies/slime_sprites.h"
 #define SLIME_SHOT_CAPACITY (16 * ENEMY_TYPE_CAPACITY)
 #define SLIME_PROJECTILE_SPEED 50.0f // World pixels per second.
 #define FLESH_SLIME_PREFERRED_DISTANCE 100.0f
@@ -20,6 +21,7 @@ typedef struct {
     int damage;
     bool active;
     bool reflected;
+    bool ordinarySlime;
     float hitFlashTimer;
 } SlimeShot;
 typedef enum
@@ -37,6 +39,8 @@ typedef struct
     float timer;
     float hitFlashTimer;
     bool deathFinished;
+    bool ordinarySlime;
+    float dustDistance;
     int frame;
     int attackDamage;
     int hp;
@@ -96,7 +100,7 @@ static inline void FleshSlime_Update(FleshSlime *f, Player *p, SlimeShot *shots,
     if (f->state == FLEASH_SLIME_DEAD) {
         if (!f->deathFinished)
             f->deathFinished = Enemy_Animate(&f->timer, &f->frame, dt,
-                flesh_slime_range_enemy_dead_duration_ms, FLESH_SLIME_RANGE_ENEMY_DEAD_COUNT, false);
+                f->ordinarySlime?slime_slime_dead_duration_ms:flesh_slime_range_enemy_dead_duration_ms, f->ordinarySlime?SLIME_SLIME_DEAD_COUNT:FLESH_SLIME_RANGE_ENEMY_DEAD_COUNT, false);
         return;
     }
     if (p->hp <= 0) return;
@@ -110,8 +114,8 @@ static inline void FleshSlime_Update(FleshSlime *f, Player *p, SlimeShot *shots,
         float time = elapsed;
         int frame = 0;
         while (frame < FLESH_SLIME_RANGE_ENEMY_ATTACK_COUNT &&
-               time >= flesh_slime_range_enemy_attack_duration_ms[frame] / 1000.0f) {
-            time -= flesh_slime_range_enemy_attack_duration_ms[frame] / 1000.0f;
+               time >= (f->ordinarySlime?slime_slime_attack_duration_ms:flesh_slime_range_enemy_attack_duration_ms)[frame] / 1000.0f) {
+            time -= (f->ordinarySlime?slime_slime_attack_duration_ms:flesh_slime_range_enemy_attack_duration_ms)[frame] / 1000.0f;
             ++frame;
         }
         f->frame = frame < FLESH_SLIME_RANGE_ENEMY_ATTACK_COUNT ? frame : FLESH_SLIME_RANGE_ENEMY_ATTACK_COUNT - 1;
@@ -123,7 +127,7 @@ static inline void FleshSlime_Update(FleshSlime *f, Player *p, SlimeShot *shots,
                 float uy = distance > 0.001f ? dy / distance : 0;
                 shots[i] = (SlimeShot){.x = f->x + ACTOR_HALF_SIZE, .y = f->y + ACTOR_HALF_SIZE,
                     .vx = ux * SLIME_PROJECTILE_SPEED, .vy = uy * SLIME_PROJECTILE_SPEED,
-                    .lifetime = 5.0f, .damage = f->attackDamage, .active = true};
+                    .lifetime = 5.0f, .damage = f->attackDamage, .active = true, .ordinarySlime=f->ordinarySlime};
                 break;
             }
         }
@@ -140,7 +144,7 @@ static inline void FleshSlime_Update(FleshSlime *f, Player *p, SlimeShot *shots,
         f->y = fmaxf(0, fminf(GAME_HEIGHT - ACTOR_SIZE, f->y + dy / distance * step * sign));
     }
     f->timer += dt;
-    f->frame = (int)(f->timer / 0.1f) % FLESH_SLIME_RANGE_ENEMY_WALK_COUNT;
+    f->frame = (int)(f->timer / 0.1f) % (f->ordinarySlime?SLIME_SLIME_WALK_COUNT:FLESH_SLIME_RANGE_ENEMY_WALK_COUNT);
     if (f->timer >= FLEASH_SLIME_ATTACK_COOLDOWN) {
         f->state = FLEASH_SLIME_ATTACK; f->timer = 0; f->frame = 0; f->hasHit = false;
     }
@@ -148,6 +152,11 @@ static inline void FleshSlime_Update(FleshSlime *f, Player *p, SlimeShot *shots,
 
 static inline const uint16_t *FleshSlime_GetSprite(const FleshSlime *f)
 {
+    if(f->ordinarySlime) {
+        if(f->state==FLEASH_SLIME_DEAD) return slime_slime_dead[f->frame];
+        if(f->state==FLEASH_SLIME_ATTACK) return slime_slime_attack[f->frame];
+        return slime_slime_walk[f->frame];
+    }
     if (f->state == FLEASH_SLIME_DEAD) return flesh_slime_range_enemy_dead[f->frame];
     if (f->state == FLEASH_SLIME_ATTACK) return flesh_slime_range_enemy_attack[f->frame];
     return flesh_slime_range_enemy_walk[f->frame];

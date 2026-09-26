@@ -27,3 +27,5 @@ have 2 phase
 You start without arrows. Collect standard arrows from the chest in the starting room before the boss. Open a loot chest with Space, then press Space again after its animation to collect the arrow type. Holding J cycles only unlocked types. Chests block movement even after being emptied.
 
 See [checkpoint and chest settings](docs/room_interactions.md) for room positions, chest contents, trap radius, and respawn behavior.
+
+Dungeon room order, debug keys, new enemies, floor assets and tuning: see docs/dungeon_expansion.md.

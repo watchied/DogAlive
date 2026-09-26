@@ -113,18 +113,23 @@ int main(void) {
     EnemyGroup_UpdateArrowEffects(&g,3.01f);assert(g.coffin.hp==COFFIN_HP && g.coffin.swordHP==COFFIN_SWORDS_HP-70);
     // Full test-room route, death gate and persistent defeated state.
     StageProgress stage={0};SlimeShot slime[SLIME_SHOT_CAPACITY]={0};RunningEffect effect={0};Player_Init(&p);
-    Stage_Load(0,&p,&g,arrows,slime,&effect);
-    SDL_FRect door=Stage_ExitBox(0);p.x=door.x;p.y=door.y;Stage_Update(&stage,&p,&g,arrows,slime,&effect);
-    assert(stage.index==STAGE_COFFIN_ROOM && g.coffin.state==FC_DORMANT);
-    door=Stage_ExitBox(stage.index);p.x=door.x;p.y=door.y;Stage_Update(&stage,&p,&g,arrows,slime,&effect);assert(stage.index==STAGE_COFFIN_ROOM);
-    Coffin_Enter(&g.coffin,FC_IDLE);Coffin_DamageSwords(&g.coffin,COFFIN_SWORDS_HP);Coffin_Damage(&g.coffin,COFFIN_HP);assert(Stage_EnemiesAlive(&g)==1);
-    tick(&g.coffin,&p,COFFIN_DEATH_TIME+0.01f);Stage_Update(&stage,&p,&g,arrows,slime,&effect);assert(stage.index==STAGE_BOSS_ROOM);
-    door=Stage_BackBox(stage.index);p.x=door.x;p.y=door.y;Stage_Update(&stage,&p,&g,arrows,slime,&effect);
-    assert(stage.index==STAGE_COFFIN_ROOM && g.coffin.state==FC_DEAD);
+    stage.index=STAGE_COFFIN_ROOM;
+    Stage_Load(stage.index,&p,&g,arrows,slime,&effect);
+    assert(g.coffin.state==FC_DORMANT);
+    SDL_FRect door=Stage_ExitBox(stage.index);
+    p.x=door.x;p.y=door.y;Stage_Update(&stage,&p,&g,arrows,slime,&effect);
+    assert(!stage.completed);
+    Coffin_Enter(&g.coffin,FC_IDLE);Coffin_DamageSwords(&g.coffin,COFFIN_SWORDS_HP);
+    Coffin_Damage(&g.coffin,COFFIN_HP);assert(Stage_EnemiesAlive(&g)==1);
+    tick(&g.coffin,&p,COFFIN_DEATH_TIME+0.01f);
+    Stage_Update(&stage,&p,&g,arrows,slime,&effect);
+    assert(stage.completed && stage.index==STAGE_COFFIN_ROOM);
     combat(&c,1);c.state=FC_FALL;
     assert(Coffin_Sprite(&c)==flesh_coffin_idle_sword[0]);
     c.swordHP=0;assert(Coffin_Sprite(&c)==flesh_coffin_idle_nosword[0]);
-    c.phase=2;assert(Coffin_Sprite(&c)==flesh_coffin_idle_phase2[0]);
+    c.phase=2;assert(Coffin_Sprite(&c)==flesh_coffin_phase2_slam[0]);
+    c.state=FC_RECOVER;c.timer=0;assert(Coffin_Sprite(&c)==flesh_coffin_phase2_slam[COFFIN_SLAM_IMPACT_FRAME]);
+    c.timer=COFFIN_SLAM_RECOVERY;assert(Coffin_Sprite(&c)==flesh_coffin_phase2_slam[FLESH_COFFIN_PHASE2_SLAM_COUNT-1]);
     Player_Init(&p);p.x=100;p.y=100;
     Coffin_Slam(&c,&p);
     int patches=0;
@@ -234,6 +239,16 @@ int main(void) {
     p.y=body.y+body.h-PLAYER_HITBOX_OFFSET-2;
     Coffin_ResolvePlayerCollision(&c,&p);
     assert(!Coffin_Overlap(body,Player_Body(&p)));
+    // Aim at targets on each screen side and verify the actual slash sprite.
+    combat(&c,2);c.x=160;c.y=120;Coffin_Enter(&c,FC_SLASH);
+    const float offsets[4][2]={{0,-60},{60,0},{-60,0},{0,60}};
+    for(int side=0;side<4;++side) {
+        p.x=c.x+offsets[side][0]-ACTOR_HALF_SIZE;
+        p.y=c.y+offsets[side][1]-ACTOR_HALF_SIZE;
+        Coffin_Aim(&c,&p);
+        assert(Coffin_Sprite(&c)==((side==1 || side==3)?flesh_coffin_phase2Attack_swordFront[0]:
+            flesh_coffin_phase2Attack_swordBack[0]));
+    }
     puts("Flesh Coffin dust DoT, fall sprites, skills, phases, parry, phase 1 walking and route passed");
     return 0;
 }

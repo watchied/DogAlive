@@ -64,6 +64,7 @@ static inline void MeleeSlash_Ghoul(SDL_Renderer *r, const Ghoul *g)
     int frame = MeleeSlash_Frame(g->timer - GHOUL_ATTACK_WINDUP,
         monster_slash_frames_duration_ms, MONSTER_SLASH_FRAMES_COUNT);
     if (frame >= 0) MeleeSlash_Draw(r, g->x, g->y, g->direction,
-        monster_slash_frames[frame], MONSTER_SLASH_WIDTH, MONSTER_SLASH_HEIGHT, 1, 1, ACTOR_HALF_SIZE);
+        monster_slash_frames[frame], MONSTER_SLASH_WIDTH, MONSTER_SLASH_HEIGHT,
+        (g->goblin?GOBLIN_MELEE_REACH:GHOUL_MELEE_REACH)/MELEE_REACH,1,ACTOR_HALF_SIZE);
 }
 #endif

@@ -3,6 +3,9 @@
 #include "src/combat/enemy_combat.h"
 #include "src/enemies/slime_king.h"
 #include "src/enemies/flesh_coffin.h"
+#include "src/enemies/goblin.h"
+#include "src/enemies/slime.h"
+#define FLESH_SLIME_DUST_SPACING 12.0f
 #define ENEMY_TARGET_CAPACITY (ENEMY_TYPE_CAPACITY * 3 + 5)
 
 typedef struct { int damageLeft, ticksLeft; float timer; } EnemyBurn;
@@ -16,6 +19,7 @@ typedef struct {
     ArrowExplosion explosions[MAX_PROJECTILES];
     SlimeKing king;
     FleshCoffin coffin;
+    FleshCoffin slimeDust; // Shared dust pool; never activated as an enemy.
 } EnemyGroup;
 
 static inline void EnemyGroup_InitCounts(EnemyGroup *group, int ghouls, int slimes, int eyes)
@@ -277,7 +281,19 @@ static inline void EnemyGroup_Update(EnemyGroup *g, Player *p, SlimeShot *shots,
             s->active = false;
     }
     SlimeShots_Update(shots, p, dt);
-    for (int i = 0; i < g->slimeCount; ++i) FleshSlime_Update(&g->slimes[i], p, shots, dt);
+    Coffin_UpdateDust(&g->slimeDust,p,dt);
+    for (int i = 0; i < g->slimeCount; ++i) {
+        FleshSlime *s=&g->slimes[i];
+        float x=s->x,y=s->y;
+        FleshSlime_Update(s,p,shots,dt);
+        if(!s->ordinarySlime && s->hp>0) {
+            s->dustDistance+=hypotf(s->x-x,s->y-y);
+            if(s->dustDistance>=FLESH_SLIME_DUST_SPACING) {
+                s->dustDistance=fmodf(s->dustDistance,FLESH_SLIME_DUST_SPACING);
+                Coffin_AddDust(&g->slimeDust,s->x+ACTOR_HALF_SIZE,s->y+ACTOR_HALF_SIZE);
+            }
+        }
+    }
     for (int i = 0; i < g->eyeCount; ++i) EyeParasite_Update(&g->eyes[i], p, dt);
     if (p->hp > 0 && dt > 0) EnemyGroup_Separate(g, dt);
     King_Update(&g->king, p, dt);

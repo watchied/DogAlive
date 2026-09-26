@@ -46,6 +46,7 @@
 #define COFFIN_WALL_RAYS 3 // Mini blades per sword/edge; three distinct edges.
 #define COFFIN_WALL_MARGIN 20.0f
 #define COFFIN_PORTAL_TIME 0.9f
+#define COFFIN_SLAM_IMPACT_FRAME 4 // Zero-based frame at landing; preceding frames play during descent.
 #define COFFIN_SLAM_FALL_TIME 0.8f
 #define COFFIN_SLAM_RECOVERY 0.65f
 #define COFFIN_SLAM_CENTER_X -8.0f // Leg midpoint is at sprite x=24 on the 64-pixel canvas.

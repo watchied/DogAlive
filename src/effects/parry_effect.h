@@ -19,6 +19,7 @@ static inline void ParryEffect_Draw(SDL_Renderer *r,const Player *p)
         ++frame;
     }
     if(frame<HIT_SPARK_FRAMES_COUNT) {
+        float scale=p->chargedParryEffect?1.5f:1.0f;
         const uint16_t *pixels=hit_spark_frames[frame];
         for(int py=0;py<HIT_SPARK_HEIGHT;++py)
             for(int px=0;px<HIT_SPARK_WIDTH;++px) {
@@ -26,8 +27,8 @@ static inline void ParryEffect_Draw(SDL_Renderer *r,const Player *p)
                 if(color==0x07E0) continue;
                 SDL_SetRenderDrawColor(r,((color>>11)&31)*255/31,
                     ((color>>5)&63)*255/63,(color&31)*255/31,255);
-                SDL_FRect pixel={cx-HIT_SPARK_WIDTH/2.0f+px,
-                    cy-HIT_SPARK_HEIGHT/2.0f+py,1,1};
+                SDL_FRect pixel={cx+(px-HIT_SPARK_WIDTH/2.0f)*scale,
+                    cy+(py-HIT_SPARK_HEIGHT/2.0f)*scale,scale,scale};
                 SDL_RenderFillRect(r,&pixel);
             }
     }

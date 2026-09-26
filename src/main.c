@@ -59,7 +59,10 @@ static void Reset_Game(StageProgress *stage, Player *p, EnemyGroup *enemies,
     Game_Init(p);
     *stage = (StageProgress){0};
     uint32_t seed = (uint32_t)SDL_GetPerformanceCounter();
-    for (int i = 0; i < STAGE_COUNT; ++i) Floor_Generate(stage->floors[i], &seed);
+    for (int i = 0; i < STAGE_COUNT; ++i) {
+        if(Stage_IsDirt(i)) Floor_GenerateDirt(stage->floors[i], &seed);
+        else Floor_Generate(stage->floors[i], &seed);
+    }
     Stage_Load(0, p, enemies, arrows, shots, effect);
 }
 void Draw_Sprite_Simulated(SDL_Renderer *renderer, float x, float y, int w, int h, const uint16_t *sprite, bool flipX, bool flashWhite, bool flipY, bool flashPink)
@@ -276,6 +279,14 @@ int main(void)
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat)
             {
                 SDL_Scancode key = event.key.scancode;
+                if(gameState==GAME_PLAYING && player.hp>0 && key>=SDL_SCANCODE_1 && key<=SDL_SCANCODE_0) {
+                    int target=key==SDL_SCANCODE_0?9:key-SDL_SCANCODE_1;
+                    stage.saved[stage.index]=enemies;stage.visited[stage.index]=true;
+                    stage.index=target;stage.completed=false;
+                    Stage_Load(target,&player,&enemies,projectiles,slimeShots,&runningEffect);
+                    if(stage.visited[target]) enemies=stage.saved[target];
+                    bowInput=(BowInput){0};shootRequested=false;deltaTime=0;
+                }
                 if (gameState == GAME_PLAYING && player.hp > 0 && key == SDL_SCANCODE_J)
                     BowInput_Press(&bowInput, event.key.timestamp ? event.key.timestamp / 1000000 : SDL_GetTicks());
                 if (gameState == GAME_OVER && key == SDL_SCANCODE_RETURN) {
@@ -369,6 +380,9 @@ int main(void)
         if (gameState != GAME_MENU) {
             Stage_Draw(renderer, floorAtlas, &stage, &enemies);
             Coffin_DrawGround(renderer,&enemies.coffin);
+            for(int i=0;i<COFFIN_DUST_CAPACITY;++i) if(enemies.slimeDust.dust[i].life>0)
+                King_DrawPixels(renderer,enemies.slimeDust.dust[i].x,enemies.slimeDust.dust[i].y,
+                    blood_dust_frames[0],BLOOD_DUST_WIDTH,BLOOD_DUST_HEIGHT,0,false);
             Room_Draw(renderer, &stage, &player);
             if (player.isCharging) {
                 SDL_FRect charge = {player.x - 4, player.y - 6, 24, 3};
@@ -509,7 +523,7 @@ int main(void)
                 if (s->active)
                     // The visible bullet is centered at (8, 10) in its 16x16 canvas.
                     Draw_Sprite_Simulated(renderer, s->x - 8, s->y - 10,
-                        SLIME_BULLET_WIDTH, SLIME_BULLET_HEIGHT, slime_bullet_frame_1,
+                        SLIME_BULLET_WIDTH, SLIME_BULLET_HEIGHT, s->ordinarySlime?slime_bullet_slime[0]:slime_bullet_flesh_slime[0],
                         false, s->hitFlashTimer > 0, false, false);
             }
             Draw_Projectiles(renderer, arrowTexture, projectiles);

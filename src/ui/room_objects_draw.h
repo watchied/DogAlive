@@ -1,5 +1,6 @@
 #ifndef ROOM_OBJECTS_DRAW_H
 #define ROOM_OBJECTS_DRAW_H
+#include "assets/sprites/map/broken_coffin.h"
 #include "src/core/room_interactions.h"
 
 static inline void Room_DrawSprite(SDL_Renderer *renderer, float cx, float cy,
@@ -20,6 +21,23 @@ static inline void Room_Draw(SDL_Renderer *renderer, const StageProgress *s, con
 {
     const RoomDefinition *d = &roomDefinitions[s->index];
     const RoomObjects *r = &s->rooms[s->index];
+    for(int i=0;i<d->objectCount;++i) {
+        const RoomMapObject *o=&d->objects[i];
+        if(o->width<=0 || o->height<=0) continue;
+        int frame=o->frame;
+        if(frame<0 || frame>=BROKEN_COFFIN_FRAMES_COUNT) frame=0;
+        const uint16_t *pixels=broken_coffin_frames[frame];
+        int width=(int)ceilf(o->width),height=(int)ceilf(o->height);
+        float angle=(float)(o->angle*0.01745329252),cs=cosf(angle),sn=sinf(angle);
+        for(int y=0;y<height;++y) for(int x=0;x<width;++x) {
+            uint16_t color=pixels[(y*BROKEN_COFFIN_HEIGHT/height)*BROKEN_COFFIN_WIDTH+x*BROKEN_COFFIN_WIDTH/width];
+            if(color==0x07E0) continue;
+            SDL_SetRenderDrawColor(renderer,((color>>11)&31)*255/31,((color>>5)&63)*255/63,(color&31)*255/31,255);
+            float dx=x-width/2.0f+0.5f,dy=y-height/2.0f+0.5f;
+            SDL_FRect pixel={o->x+dx*cs-dy*sn-0.5f,o->y+dx*sn+dy*cs-0.5f,1,1};
+            SDL_RenderFillRect(renderer,&pixel);
+        }
+    }
     const char *prompt = NULL;
     if (d->checkpoint) {
         int frame = Explosion_Frame(r->checkpointTimer, checkpoint_frames_duration_ms, CHECKPOINT_FRAMES_COUNT);

@@ -8,6 +8,9 @@
 #include "src/player/player.h"
 #include "assets/sprites/enemies/bloodless_ghoul_sprites.h"
 #include <SDL3/SDL.h>
+#include "assets/sprites/enemies/goblin_sprites.h"
+#define GHOUL_MELEE_REACH (MELEE_REACH * 1.25f)
+#define GOBLIN_MELEE_REACH (MELEE_REACH * 0.75f)
 typedef enum
 {
     GHOUL_WALK,
@@ -23,6 +26,7 @@ typedef struct
     float timer;
     float hitFlashTimer;
     bool deathFinished;
+    bool goblin;
     int frame;
     int attackDamage;
     int hp;
@@ -52,19 +56,20 @@ static inline void Ghoul_Init(Ghoul *g, float x, float y)
 // กรอบตีอยู่ด้านหน้าตัว Ghoul
 static inline SDL_FRect Ghoul_AttackBox(const Ghoul *g)
 {
+    float reach=g->goblin?GOBLIN_MELEE_REACH:GHOUL_MELEE_REACH;
     switch (g->direction)
     {
     case PLAYER_UP:
-        return (SDL_FRect){g->x, g->y - MELEE_REACH, ACTOR_SIZE, MELEE_REACH};
+        return (SDL_FRect){g->x, g->y - reach, ACTOR_SIZE, reach};
 
     case PLAYER_DOWN:
-        return (SDL_FRect){g->x, g->y + ACTOR_SIZE, ACTOR_SIZE, MELEE_REACH};
+        return (SDL_FRect){g->x, g->y + ACTOR_SIZE, ACTOR_SIZE, reach};
 
     case PLAYER_LEFT:
-        return (SDL_FRect){g->x - MELEE_REACH, g->y, MELEE_REACH, ACTOR_SIZE};
+        return (SDL_FRect){g->x - reach, g->y, reach, ACTOR_SIZE};
 
     default:
-        return (SDL_FRect){g->x + ACTOR_SIZE, g->y, MELEE_REACH, ACTOR_SIZE};
+        return (SDL_FRect){g->x + ACTOR_SIZE, g->y, reach, ACTOR_SIZE};
     }
 }
 
@@ -158,11 +163,11 @@ static inline void Ghoul_Update(
 
         g->timer += dt;
         while (g->timer >=
-               bloodless_ghoul_melee_enemy_death_duration_ms[g->frame] / 1000.0f)
+               (g->goblin?goblin_death_duration_ms:bloodless_ghoul_melee_enemy_death_duration_ms)[g->frame] / 1000.0f)
         {
             g->timer -=
-                bloodless_ghoul_melee_enemy_death_duration_ms[g->frame] / 1000.0f;
-            if (g->frame + 1 >= BLOODLESS_GHOUL_MELEE_ENEMY_DEATH_COUNT)
+                (g->goblin?goblin_death_duration_ms:bloodless_ghoul_melee_enemy_death_duration_ms)[g->frame] / 1000.0f;
+            if (g->frame + 1 >= (g->goblin?GOBLIN_DEATH_COUNT:BLOODLESS_GHOUL_MELEE_ENEMY_DEATH_COUNT))
             {
                 g->deathFinished = true;
                 g->timer = 0.0f;
@@ -195,8 +200,8 @@ static inline void Ghoul_Update(
         float frameTime = attackTime;
         int attackFrame = 0;
         while (attackFrame < BLOODLESS_GHOUL_MELEE_ENEMY_SLASH_COUNT &&
-               frameTime >= bloodless_ghoul_melee_enemy_slash_duration_ms[attackFrame] / 1000.0f) {
-            frameTime -= bloodless_ghoul_melee_enemy_slash_duration_ms[attackFrame] / 1000.0f;
+               frameTime >= (g->goblin?goblin_slash_duration_ms:bloodless_ghoul_melee_enemy_slash_duration_ms)[attackFrame] / 1000.0f) {
+            frameTime -= (g->goblin?goblin_slash_duration_ms:bloodless_ghoul_melee_enemy_slash_duration_ms)[attackFrame] / 1000.0f;
             attackFrame++;
         }
         g->frame = attackFrame < BLOODLESS_GHOUL_MELEE_ENEMY_SLASH_COUNT
@@ -301,7 +306,7 @@ static inline void Ghoul_Update(
     {
         g->timer -= 0.1f;
         g->frame = (g->frame + 1) %
-                   BLOODLESS_GHOUL_MELEE_ENEMY_WALK_COUNT;
+                   (g->goblin?GOBLIN_WALK_COUNT:BLOODLESS_GHOUL_MELEE_ENEMY_WALK_COUNT);
     }
 }
 
@@ -324,6 +329,11 @@ static inline void Ghoul_ResolvePlayerCollision(const Ghoul *g, Player *p)
 
 static inline const uint16_t *Ghoul_GetSprite(const Ghoul *g)
 {
+    if(g->goblin) {
+        if(g->state==GHOUL_DEAD) return goblin_death[g->frame];
+        if(g->state==GHOUL_ATTACK) return goblin_slash[g->frame];
+        return goblin_walk[g->state==GHOUL_REST?0:g->frame];
+    }
     if (g->state == GHOUL_DEAD)
         return bloodless_ghoul_melee_enemy_death[g->frame];
 

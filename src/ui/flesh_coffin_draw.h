@@ -9,8 +9,18 @@
 #include "src/effects/melee_slash.h"
 #include "assets/sprites/effects/charge-slash.h"
 
+// Screen-space attack direction from the boss toward its target:
+// down/right = swordFront; left/up = swordBack.
+static inline bool Coffin_UsesFrontSlash(PlayerDirection attackDirection) {
+    switch(attackDirection) {
+    case PLAYER_DOWN: case PLAYER_RIGHT: return true;
+    case PLAYER_LEFT: case PLAYER_UP: return false;
+    }
+    return false;
+}
+
 static inline const uint16_t *Coffin_Sprite(const FleshCoffin *c) {
-    bool front=c->direction==PLAYER_UP || c->direction==PLAYER_RIGHT;
+    bool front=Coffin_UsesFrontSlash(c->direction);
     switch(c->state) {
     case FC_DORMANT: return flesh_coffin_opening1[0];
     case FC_INTRO: return flesh_coffin_opening1[King_VisualFrame(c->timer,COFFIN_INTRO_TIME,FLESH_COFFIN_OPENING1_COUNT)];
@@ -26,7 +36,16 @@ static inline const uint16_t *Coffin_Sprite(const FleshCoffin *c) {
         return c->swordHP>0?flesh_coffin_attack4_1_sword[King_VisualFrame(c->timer,COFFIN_PORTAL_TIME,FLESH_COFFIN_ATTACK4_1_SWORD_COUNT)]:
             flesh_coffin_attack4_1_nosword[King_VisualFrame(c->timer,COFFIN_PORTAL_TIME,FLESH_COFFIN_ATTACK4_1_NOSWORD_COUNT)];
     case FC_FALL: case FC_RECOVER:
-        return c->phase==2?flesh_coffin_idle_phase2[0]:c->swordHP>0?flesh_coffin_idle_sword[0]:flesh_coffin_idle_nosword[0];
+        if(c->phase==2) {
+            int impact=COFFIN_SLAM_IMPACT_FRAME;
+            if(impact<1) impact=1;
+            if(impact>=FLESH_COFFIN_PHASE2_SLAM_COUNT) impact=FLESH_COFFIN_PHASE2_SLAM_COUNT-1;
+            int frame=c->state==FC_FALL?
+                King_VisualFrame(c->timer,COFFIN_SLAM_FALL_TIME,impact):
+                impact+King_VisualFrame(c->timer,COFFIN_SLAM_RECOVERY,FLESH_COFFIN_PHASE2_SLAM_COUNT-impact);
+            return flesh_coffin_phase2_slam[frame];
+        }
+        return c->swordHP>0?flesh_coffin_idle_sword[0]:flesh_coffin_idle_nosword[0];
     case FC_TELEPORT:
         if (c->skill == 2) {
             float half = COFFIN_TELEPORT_TIME * 0.5f;

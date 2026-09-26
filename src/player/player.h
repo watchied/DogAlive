@@ -14,12 +14,12 @@
 #define PLAYER_START_EXPLOSIVE_ARROW 0
 #define PLAYER_START_ENCHANT_BLADE 1
 #define PLAYER_DEFAULT_SPEED 40.0f
-#define PLAYER_MAX_HP 900
+#define PLAYER_MAX_HP 100
 #define PLAYER_HITBOX_SIZE 13.0f
 #define PLAYER_HITBOX_OFFSET ((ACTOR_SIZE - PLAYER_HITBOX_SIZE) / 2.0f)
 #define PLAYER_START_POTIONS 2
 #define PLAYER_POTION_HEAL 60
-#define PLAYER_POTION_USE_TIME 2.0f
+#define PLAYER_POTION_USE_TIME 1.5f
 #define PLAYER_POTION_MOVE_MULTIPLIER 0.7f
 #define PLAYER_COLLISION_GRACE_TIME 0.5f
 #define PLAYER_HIT_FLASH_TIME 0.16f
@@ -32,7 +32,7 @@
 #define PLAYER_STAMINA_REGEN 30.0f
 #define PLAYER_SPRINT_MIN_STAMINA 20.0f
 #define PLAYER_DOUBLE_TAP_TIME 0.25f
-#define PLAYER_ATTACK_DAMAGE 400
+#define PLAYER_ATTACK_DAMAGE 30
 #define PLAYER_MELEE_STAMINA_COST 15.0f // Stamina spent once when starting a slash.
 #define PLAYER_CHARGE_TIME 1.5f
 #define PLAYER_CHARGE_REACH 64.0f // Forward distance from the player's center.
@@ -81,6 +81,7 @@ typedef struct
     int deathFrame;
     float deathTimer;
     float hitFlashTimer;
+    bool chargedParryEffect;
     float parryEffectTimer, parryEffectX, parryEffectY;
     float collisionGraceTimer;
     float invincibilityTimer;
@@ -132,6 +133,7 @@ typedef struct
 static inline void Player_ShowParry(Player *p, float enemyX, float enemyY)
 {
     p->parryEffectTimer = PLAYER_PARRY_EFFECT_TIME;
+    p->chargedParryEffect = p->chargedAttack;
     p->parryEffectX = (p->x + ACTOR_HALF_SIZE + enemyX) / 2;
     p->parryEffectY = (p->y + ACTOR_HALF_SIZE + enemyY) / 2;
 }

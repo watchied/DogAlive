@@ -50,18 +50,18 @@ int main(void)
     SDL_FRect door = Stage_ExitBox(0);
     p.x = door.x; p.y = door.y;
     Stage_Update(&stage, &p, &enemies, arrows, shots, &effect);
-    assert(stage.index == STAGE_COFFIN_ROOM);
+    assert(stage.index == 1);
     Stage_Update(&stage, &p, &enemies, arrows, shots, &effect);
-    assert(stage.index == STAGE_COFFIN_ROOM); // Arrival must not bounce back automatically.
-    enemies.coffin.hp = 17;
-    door = Stage_BackBox(STAGE_COFFIN_ROOM);
+    assert(stage.index == 1); // Arrival must not bounce back automatically.
+    enemies.ghouls[0].hp = 17;
+    door = Stage_BackBox(1);
     p.x = door.x; p.y = door.y;
     Stage_Update(&stage, &p, &enemies, arrows, shots, &effect);
     assert(stage.index == 0 && Stage_EnemiesAlive(&enemies) == 0);
     door = Stage_ExitBox(0);
     p.x = door.x; p.y = door.y;
     Stage_Update(&stage, &p, &enemies, arrows, shots, &effect);
-    assert(stage.index == STAGE_COFFIN_ROOM && enemies.coffin.hp == 17);
+    assert(stage.index == 1 && enemies.ghouls[0].hp == 17);
     for (int side = STAGE_RIGHT; side <= STAGE_BOTTOM; ++side) {
         door = Stage_DoorBox((StageSide)side, 0.5f);
         Stage_PlaceAtDoor(&p, door, (StageSide)side);

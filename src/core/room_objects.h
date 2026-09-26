@@ -14,7 +14,20 @@
 #define CHEST_BODY_OFFSET_Y 4.0f
 typedef enum { CHEST_CLOSED, CHEST_OPENING, CHEST_OPEN, CHEST_COLLECTED } ChestState;
 typedef struct { float x, y; ArrowType arrow; bool trap; bool enchantBlade; } ChestDefinition;
-typedef struct { bool checkpoint; float checkpointX, checkpointY; int chestCount; ChestDefinition chests[ROOM_CHEST_CAPACITY]; } RoomDefinition;
+#define ROOM_MAP_OBJECT_CAPACITY 32
+typedef struct {
+    float x,y; // Visual center.
+    int frame; // Zero-based broken_coffin variant.
+    float width,height; // Display size.
+    double angle; // Clockwise degrees.
+    bool solid;
+    float hitWidth,hitHeight,hitOffsetX,hitOffsetY; // World-axis collision box.
+} RoomMapObject;
+static inline SDL_FRect Room_MapObjectBody(const RoomMapObject *o) {
+    return (SDL_FRect){o->x+o->hitOffsetX-o->hitWidth/2,
+        o->y+o->hitOffsetY-o->hitHeight/2,o->solid?o->hitWidth:0,o->solid?o->hitHeight:0};
+}
+typedef struct { bool checkpoint; float checkpointX, checkpointY; int chestCount; ChestDefinition chests[ROOM_CHEST_CAPACITY]; int objectCount; RoomMapObject objects[ROOM_MAP_OBJECT_CAPACITY]; } RoomDefinition;
 typedef struct { ChestState state; float timer, blastTimer; } RoomChest;
 typedef struct { float checkpointTimer; bool checkpointActivated; RoomChest chests[ROOM_CHEST_CAPACITY]; } RoomObjects;
 
@@ -26,8 +39,9 @@ static inline SDL_FRect Room_ChestBody(const ChestDefinition *c)
 // Resolve overlap after knockback, spawning, or movement. Open/empty chests remain solid.
 static inline void Room_Collide(const RoomDefinition *room, Player *p)
 {
-    for (int i = 0; i < room->chestCount; ++i) {
-        SDL_FRect b = Room_ChestBody(&room->chests[i]);
+    for (int i = 0; i < room->chestCount+room->objectCount; ++i) {
+        SDL_FRect b = i<room->chestCount?Room_ChestBody(&room->chests[i]):Room_MapObjectBody(&room->objects[i-room->chestCount]);
+        if(b.w<=0 || b.h<=0) continue;
         float dx = p->x + ACTOR_HALF_SIZE - (b.x + b.w / 2);
         float dy = p->y + ACTOR_HALF_SIZE - (b.y + b.h / 2);
         float ox = (PLAYER_HITBOX_SIZE + b.w) / 2 - fabsf(dx);
@@ -42,16 +56,18 @@ static inline void Room_BlockMovement(const RoomDefinition *room, Player *p, flo
 {
     float targetY = p->y;
     p->y = oldY;
-    for (int i = 0; i < room->chestCount; ++i) {
-        SDL_FRect b = Room_ChestBody(&room->chests[i]);
+    for (int i = 0; i < room->chestCount+room->objectCount; ++i) {
+        SDL_FRect b = i<room->chestCount?Room_ChestBody(&room->chests[i]):Room_MapObjectBody(&room->objects[i-room->chestCount]);
+        if(b.w<=0 || b.h<=0) continue;
         SDL_FRect body = Player_Body(p);
         if (body.y >= b.y + b.h || body.y + body.h <= b.y) continue;
         if (oldX + PLAYER_HITBOX_OFFSET + body.w <= b.x && body.x + body.w > b.x) p->x = b.x - body.w - PLAYER_HITBOX_OFFSET;
         else if (oldX + PLAYER_HITBOX_OFFSET >= b.x + b.w && body.x < b.x + b.w) p->x = b.x + b.w - PLAYER_HITBOX_OFFSET;
     }
     p->y = targetY;
-    for (int i = 0; i < room->chestCount; ++i) {
-        SDL_FRect b = Room_ChestBody(&room->chests[i]);
+    for (int i = 0; i < room->chestCount+room->objectCount; ++i) {
+        SDL_FRect b = i<room->chestCount?Room_ChestBody(&room->chests[i]):Room_MapObjectBody(&room->objects[i-room->chestCount]);
+        if(b.w<=0 || b.h<=0) continue;
         SDL_FRect body = Player_Body(p);
         if (body.x >= b.x + b.w || body.x + body.w <= b.x) continue;
         if (oldY + PLAYER_HITBOX_OFFSET + body.h <= b.y && body.y + body.h > b.y) p->y = b.y - body.h - PLAYER_HITBOX_OFFSET;
