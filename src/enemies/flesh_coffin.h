@@ -12,8 +12,10 @@ typedef enum {
 typedef struct { float x, y, vx, vy, life; int damage; bool active, reflectable, reflected; } CoffinShot;
 typedef struct { float x, y, fromX, fromY, toX, toY; bool active; } CoffinSword;
 typedef struct { float x, y, life; } CoffinDust;
+typedef struct { float x,y,angle; } CoffinFallenSword;
 typedef struct {
     bool active, hit, parried, moving;
+    bool rescueRequested,rescueDone;
     int hp, swordHP, phase, skill, lastSkill, count, repeats;
     int wallEdges[3];
     unsigned int parriedSwing;
@@ -25,6 +27,9 @@ typedef struct {
     PlayerDirection direction;
     CoffinState state;
     CoffinSword swords[3];
+    CoffinFallenSword fallenSwords[3];
+    bool swordsDropped;
+    float swordDropTimer;
     CoffinShot shots[COFFIN_SHOT_CAPACITY];
     CoffinDust dust[COFFIN_DUST_CAPACITY];
     float dustContactTimer;
@@ -53,13 +58,17 @@ static inline void Coffin_Init(FleshCoffin *c) {
 }
 static inline void Coffin_DamageSwords(FleshCoffin *c, int damage);
 static inline void Coffin_Damage(FleshCoffin *c, int damage) {
-    if (!Coffin_Targetable(c) || damage <= 0) return;
+    if (!Coffin_Targetable(c) || c->rescueRequested || damage <= 0) return;
     if (c->phase == 1 && c->swordHP > 0) {
         Coffin_DamageSwords(c, damage);
         c->flash = 0.12f;
         return; // Breaking the sword shield never spills damage into boss HP.
     }
-    c->hp = c->hp > damage ? c->hp - damage : 0; c->flash = 0.12f;
+    int nextHP=c->hp>damage?c->hp-damage:0;
+    if(!c->rescueDone && nextHP<=COFFIN_HP/2) {
+        c->hp=COFFIN_HP/2;c->phase=2;c->rescueRequested=true;c->flash=0.12f;return;
+    }
+    c->hp = nextHP; c->flash = 0.12f;
     if (!c->hp) { Coffin_ClearAttacks(c); Coffin_Enter(c, FC_DEATH); }
     else if (c->phase == 1 && c->hp <= COFFIN_HP * COFFIN_PHASE_RATIO) {
         c->phase = 2; Coffin_ClearAttacks(c); Coffin_Enter(c, FC_TRANSITION);
@@ -69,6 +78,15 @@ static inline void Coffin_DamageSwords(FleshCoffin *c, int damage) {
     if (!c->active || c->phase != 1 || c->swordHP <= 0 || damage <= 0) return;
     c->swordHP = c->swordHP > damage ? c->swordHP - damage : 0;
     if (!c->swordHP) {
+        c->swordsDropped=true;c->swordDropTimer=0;
+        for(int i=0;i<3;++i) {
+            const CoffinSword *s=&c->swords[i];
+            c->fallenSwords[i]=(CoffinFallenSword){
+                s->active?s->x:c->x+(i-1)*12,
+                s->active?s->y:c->y,
+                1.57079632679f+(i-1)*0.3f
+            };
+        }
         memset(c->swords, 0, sizeof(c->swords));
         if (c->state == FC_RELEASE || c->state == FC_GROUND || c->state == FC_STABS || c->state == FC_WALL || c->state == FC_ORBIT || c->state == FC_RETURN)
             Coffin_Enter(c, FC_IDLE);
@@ -177,7 +195,18 @@ static inline void Coffin_Slam(FleshCoffin *c, Player *p) {
     float dy=cy-fmaxf(p->y + PLAYER_HITBOX_OFFSET, fminf(cy, p->y + PLAYER_HITBOX_OFFSET + PLAYER_HITBOX_SIZE));
     if (dx*dx+dy*dy<=COFFIN_SLAM_RADIUS*COFFIN_SLAM_RADIUS) Enemy_HurtPlayer(p,COFFIN_SLAM_DAMAGE,cx,cy);
     if (c->phase==1 && c->swordHP>0) Coffin_Radial(c,c->x,c->y,COFFIN_SLAM_RAYS);
-    if (c->phase==2) Coffin_SpawnDust(c);
+    if (c->phase==2) {
+        Coffin_SpawnDust(c);
+        // Evenly spread patches across the impact disk; the first covers its center.
+        float rotation=Coffin_Range(c,0,6.28318530718f);
+        for(int i=0;i<COFFIN_SLAM_DUST_COUNT;++i) {
+            float radius=COFFIN_SLAM_DUST_SPREAD*sqrtf(i/(float)(COFFIN_SLAM_DUST_COUNT>1?COFFIN_SLAM_DUST_COUNT-1:1));
+            float angle=rotation+i*2.39996323f;
+            float x=fmaxf(COFFIN_DUST_RADIUS,fminf(GAME_WIDTH-COFFIN_DUST_RADIUS,cx+cosf(angle)*radius));
+            float y=fmaxf(COFFIN_DUST_RADIUS,fminf(GAME_HEIGHT-COFFIN_DUST_RADIUS,cy+sinf(angle)*radius));
+            Coffin_AddDust(c,x,y);
+        }
+    }
 }
 static inline void Coffin_PlaceNear(FleshCoffin *c,const Player *p, bool front) {
     int side=front?p->direction:(int)(Coffin_Random(c)%4);
@@ -235,7 +264,10 @@ static inline void Coffin_SetStab(FleshCoffin *c,const Player *p) {
     s->x=s->fromX;s->y=s->fromY;s->active=true;c->hit=false;
 }
 static inline void Coffin_Update(FleshCoffin *c,Player *p,float dt) {
-    if (!c->active || c->state==FC_DEAD) return;
+    if (!c->active || c->rescueRequested) return;
+    if(c->swordsDropped && p->hp>0)
+        c->swordDropTimer=fminf(COFFIN_SWORD_DROP_TIME,c->swordDropTimer+dt);
+    if(c->state==FC_DEAD) return;
     c->moving=false;
     c->slamEffectTimer=fmaxf(0,c->slamEffectTimer-dt);
     c->flash=fmaxf(0,c->flash-dt);

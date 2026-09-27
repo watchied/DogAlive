@@ -37,7 +37,9 @@ int main(void)
     assert(p.arrowType == ARROW_NORMAL);
     Room_Update(&s, &p, 1);
     p.x += 4;
+    p.hp=1;p.healingPotions=0;p.potionUseTimer=0.5f;
     assert(Room_Interact(&s, &p) && s.respawnX == p.x && s.rooms[0].checkpointTimer > 0);
+    assert(p.hp==p.maxHP && p.healingPotions==PLAYER_START_POTIONS && p.potionUseTimer==0);
     float spawnX = p.x;
     s.index = STAGE_BOSS_ROOM;
     Stage_Load(s.index, &p, &enemies, arrows, shots, &effect);
@@ -67,7 +69,7 @@ int main(void)
     assert(s.index == STAGE_BOSS_ROOM);
     sideDoor = Stage_ExitBox(s.index); p.x = sideDoor.x; p.y = sideDoor.y;
     Stage_Update(&s, &p, &enemies, arrows, shots, &effect);
-    assert(s.index == STAGE_REWARD_ROOM + 1);
+    assert(s.index == STAGE_ENTRANCE_ROOM);
     door = Stage_BackBox(s.index); p.x = door.x; p.y = door.y;
     Stage_Update(&s, &p, &enemies, arrows, shots, &effect);
     assert(s.index == STAGE_BOSS_ROOM && p.x > GAME_WIDTH - 50);

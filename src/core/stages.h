@@ -5,7 +5,8 @@
 #include "src/core/floor_tiles.h"
 #include "src/core/room_objects.h"
 
-#define STAGE_COUNT 10
+#define STAGE_COUNT 11
+#define STAGE_ENTRANCE_ROOM 10
 #define STAGE_COFFIN_ROOM 9
 #define STAGE_FINAL_ROOM STAGE_COFFIN_ROOM
 #define STAGE_START_ROOM 0
@@ -13,30 +14,21 @@
 #define STAGE_REWARD_ROOM 4
 #define STAGE_WALL_SIZE 4.0f
 typedef enum { STAGE_RIGHT, STAGE_LEFT, STAGE_TOP, STAGE_BOTTOM } StageSide;
-typedef struct { int ghouls, slimes, eyes; StageSide nextSide; bool slimeKing; } StageDefinition;
-// {ghouls, slimes, eyes, next exit side, enable Slime King}.
-// Choose STAGE_TOP/BOTTOM/LEFT/RIGHT for the exit side.
-// The next room's return door is automatically on the opposite side.
-// If both doors share a wall, they are separated at 30% and 70% of that wall.
+typedef struct { StageSide nextSide; } StageDefinition;
+// Exit directions only. Enemy types/counts/positions are in enemy_layouts.h.
 static const StageDefinition stageDefinitions[STAGE_COUNT] = {
-    {0,0,0,STAGE_RIGHT,false}, // Starting checkpoint.
-    {2,1,0,STAGE_RIGHT,false}, // Goblins and ordinary slimes.
-    {3,2,0,STAGE_RIGHT,false},
-    {0,0,0,STAGE_RIGHT,true},
-    {0,0,0,STAGE_RIGHT,false}, // Reward branch above Slime King.
-    {2,1,0,STAGE_TOP,false},
-    {3,1,1,STAGE_RIGHT,false},
-    {3,2,2,STAGE_BOTTOM,false},
-    {4,3,2,STAGE_RIGHT,false},
-    {0,0,0,STAGE_RIGHT,false}
+    {STAGE_RIGHT},{STAGE_RIGHT},{STAGE_RIGHT},{STAGE_RIGHT},{STAGE_RIGHT},
+    {STAGE_TOP},{STAGE_RIGHT},{STAGE_BOTTOM},{STAGE_RIGHT},{STAGE_RIGHT},{STAGE_TOP}
 };
-static inline bool Stage_IsDirt(int index) { return index==1 || index==2; }
+#include "src/core/enemy_layouts.h"
+static inline bool Stage_IsDirt(int index) { return index==1 || index==2 || index==STAGE_BOSS_ROOM || index==STAGE_REWARD_ROOM; }
 
 #include "src/core/room_layouts.h"
 
 typedef struct {
     int index;
     bool completed;
+    bool returningHome;
     bool hasCheckpoint;
     int checkpointStage;
     float respawnX, respawnY;
@@ -63,18 +55,24 @@ static inline StageSide Stage_Opposite(StageSide side)
 }
 static inline StageSide Stage_BackSide(int index)
 {
+    if(index==STAGE_ENTRANCE_ROOM) return STAGE_LEFT;
+    if(index==5) return STAGE_BOTTOM;
     if (index == STAGE_REWARD_ROOM) return STAGE_BOTTOM;
     if (index == STAGE_REWARD_ROOM + 1) return Stage_Opposite(stageDefinitions[STAGE_BOSS_ROOM].nextSide);
     return index > 0 ? Stage_Opposite(stageDefinitions[index - 1].nextSide) : STAGE_LEFT;
 }
 static inline int Stage_Next(int index)
 {
+    if(index==STAGE_BOSS_ROOM) return STAGE_ENTRANCE_ROOM;
+    if(index==STAGE_ENTRANCE_ROOM) return 5;
     if(index==STAGE_FINAL_ROOM) return STAGE_COUNT;
     return index == STAGE_BOSS_ROOM ? STAGE_REWARD_ROOM + 1 : index + 1;
 }
 static inline int Stage_Previous(int index)
 {
-    return index == STAGE_REWARD_ROOM || index == STAGE_REWARD_ROOM + 1 ? STAGE_BOSS_ROOM : index - 1;
+    if(index==STAGE_ENTRANCE_ROOM) return STAGE_BOSS_ROOM;
+    if(index==5) return STAGE_ENTRANCE_ROOM;
+    return index == STAGE_REWARD_ROOM ? STAGE_BOSS_ROOM : index - 1;
 }
 static inline SDL_FRect Stage_DoorBox(StageSide side, float position)
 {
@@ -86,11 +84,13 @@ static inline SDL_FRect Stage_DoorBox(StageSide side, float position)
 }
 static inline SDL_FRect Stage_ExitBox(int index)
 {
+    if(index==STAGE_ENTRANCE_ROOM) return (SDL_FRect){136,164,36,20};
     bool sameSide = index > 0 && Stage_BackSide(index) == stageDefinitions[index].nextSide;
     return Stage_DoorBox(stageDefinitions[index].nextSide, sameSide ? 0.7f : 0.5f);
 }
 static inline SDL_FRect Stage_BackBox(int index)
 {
+    if(index==STAGE_ENTRANCE_ROOM) return (SDL_FRect){4,196,8,36};
     bool sameSide = Stage_BackSide(index) == stageDefinitions[index].nextSide;
     return Stage_DoorBox(Stage_BackSide(index), sameSide ? 0.3f : 0.5f);
 }
@@ -114,25 +114,7 @@ static inline void Stage_ClampPlayer(Player *p)
 static inline void Stage_Load(int index, Player *p, EnemyGroup *enemies,
                                Projectile *arrows, SlimeShot *shots, RunningEffect *effect)
 {
-    StageDefinition d = stageDefinitions[index];
-    EnemyGroup_InitCounts(enemies, d.ghouls, d.slimes, d.eyes);
-    if(Stage_IsDirt(index)) {
-        for(int i=0;i<enemies->ghoulCount;++i) {
-            Ghoul *g=&enemies->ghouls[i];Goblin_Init(g,g->x,g->y);
-        }
-        for(int i=0;i<enemies->slimeCount;++i) {
-            FleshSlime *f=&enemies->slimes[i];Slime_Init(f,f->x,f->y);
-        }
-    }
-    if(index==STAGE_COFFIN_ROOM) {
-        Coffin_Init(&enemies->coffin);
-        enemies->coffin.y=72;
-        enemies->coffin.rng ^= (uint32_t)SDL_GetPerformanceCounter();
-    }
-    if (d.slimeKing) {
-        King_Init(&enemies->king, 220, 100);
-        enemies->king.rng ^= (uint32_t)SDL_GetPerformanceCounter();
-    }
+    EnemyLayout_Load(enemyLayouts[index],enemies);
     Projectiles_Reset(arrows);
     memset(shots, 0, sizeof(SlimeShot) * SLIME_SHOT_CAPACITY);
     *effect = (RunningEffect){0};
@@ -167,22 +149,31 @@ static inline void Stage_BlockEnemies(int index,EnemyGroup *g) {
     if(g->coffin.active && g->coffin.state!=FC_FALL && g->coffin.state!=FC_PORTAL && g->coffin.state!=FC_TELEPORT)
         Stage_BlockEnemyBody(room,&g->coffin.x,&g->coffin.y,Coffin_Body(&g->coffin));
 }
+// Walkable foreground plus the narrow mouth of the cave.
+static inline void Entrance_Clamp(Player *p) {
+    Stage_ClampPlayer(p);
+    SDL_FRect b=Player_Body(p);
+    float top=(b.x>=132 && b.x+b.w<=176)?164:192;
+    if(b.y<top) p->y=top-PLAYER_HITBOX_OFFSET;
+}
 static inline void Stage_Update(StageProgress *stage, Player *p, EnemyGroup *enemies,
                                  Projectile *arrows, SlimeShot *shots, RunningEffect *effect)
 {
     Stage_BlockEnemies(stage->index,enemies);
     Stage_ClampPlayer(p); // Also contains damage knockback and body pushes.
     Room_Collide(&roomDefinitions[stage->index], p);
+    if(stage->index==STAGE_ENTRANCE_ROOM) Entrance_Clamp(p);
     if (p->hp <= 0 || stage->completed) return;
     SDL_FRect exit = Stage_ExitBox(stage->index);
     SDL_FRect back = Stage_BackBox(stage->index);
     SDL_FRect body = Player_Body(p);
     bool backwards = stage->index > 0 && SDL_HasRectIntersectionFloat(&back, &body);
+    if(stage->returningHome && !backwards) return;
     SDL_FRect rewardDoor = Stage_DoorBox(STAGE_TOP, 0.5f);
     bool reward = stage->index == STAGE_BOSS_ROOM && SDL_HasRectIntersectionFloat(&rewardDoor, &body);
     if (!backwards && (Stage_EnemiesAlive(enemies) != 0 ||
         (!reward && (stage->index == STAGE_REWARD_ROOM || !SDL_HasRectIntersectionFloat(&exit, &body))))) return;
-    if (!backwards && Stage_Next(stage->index) == STAGE_COUNT) { stage->completed = true; return; }
+    if (!backwards && Stage_Next(stage->index) == STAGE_COUNT) { if(!stage->returningHome) stage->completed = true; return; }
     bool fromReward = stage->index == STAGE_REWARD_ROOM;
     stage->saved[stage->index] = *enemies;
     stage->visited[stage->index] = true;
@@ -192,13 +183,19 @@ static inline void Stage_Update(StageProgress *stage, Player *p, EnemyGroup *ene
     if (fromReward) Stage_PlaceAtDoor(p, rewardDoor, STAGE_TOP);
     else Stage_PlaceAtDoor(p, backwards ? Stage_ExitBox(stage->index) : Stage_BackBox(stage->index),
         backwards ? stageDefinitions[stage->index].nextSide : Stage_BackSide(stage->index));
+    if(stage->index==STAGE_ENTRANCE_ROOM) Entrance_Clamp(p);
 }
 static inline void Stage_Draw(SDL_Renderer *renderer, SDL_Texture *floorAtlas, const StageProgress *stage, const EnemyGroup *enemies)
 {
     SDL_SetRenderDrawColor(renderer, 16 + stage->index * 3, 18, 24, 255);
     SDL_FRect floor = {0, 0, GAME_WIDTH, GAME_HEIGHT};
     SDL_RenderFillRect(renderer, &floor);
+    bool night=FLOOR_NIGHT_ENABLED && Stage_IsDirt(stage->index);
+    Uint8 oldR=255,oldG=255,oldB=255;
+    SDL_GetTextureColorMod(floorAtlas,&oldR,&oldG,&oldB);
+    if(night) SDL_SetTextureColorMod(floorAtlas,FLOOR_NIGHT_RED,FLOOR_NIGHT_GREEN,FLOOR_NIGHT_BLUE);
     Floor_Draw(renderer, floorAtlas, stage->floors[stage->index]);
+    SDL_SetTextureColorMod(floorAtlas,oldR,oldG,oldB);
     SDL_SetRenderDrawColor(renderer, 75, 75, 85, 255);
     SDL_FRect walls[] = {{0,0,GAME_WIDTH,STAGE_WALL_SIZE}, {0,GAME_HEIGHT-STAGE_WALL_SIZE,GAME_WIDTH,STAGE_WALL_SIZE},
         {0,0,STAGE_WALL_SIZE,GAME_HEIGHT}, {GAME_WIDTH-STAGE_WALL_SIZE,0,STAGE_WALL_SIZE,GAME_HEIGHT}};

@@ -9,6 +9,9 @@ static inline bool Room_Interact(StageProgress *s, Player *p)
     const RoomDefinition *d = &roomDefinitions[s->index];
     RoomObjects *r = &s->rooms[s->index];
     if (d->checkpoint && Room_Near(p, d->checkpointX, d->checkpointY)) {
+        p->hp = p->maxHP;
+        p->healingPotions = PLAYER_START_POTIONS;
+        p->potionUseTimer = 0; // Cancel any pending drink after fully restoring HP.
         s->hasCheckpoint = true;
         s->checkpointStage = s->index;
         s->respawnX = p->x; s->respawnY = p->y;

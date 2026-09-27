@@ -3,6 +3,8 @@
 // World pixels, seconds, HP. Test room is configured in stages.h.
 #define COFFIN_HP 1000
 #define COFFIN_SWORDS_HP 400
+#define COFFIN_SWORD_DROP_TIME 0.45f
+#define COFFIN_SWORD_DROP_DISTANCE 12.0f
 #define COFFIN_PHASE_RATIO 0.75f
 #define COFFIN_TRIGGER_RADIUS 85.0f
 #define COFFIN_INTRO_TIME 5.0f
@@ -55,7 +57,9 @@
 #define COFFIN_SLAM_RADIUS 25.0f
 #define COFFIN_SLAM_DAMAGE 30
 #define COFFIN_SLAM_RAYS 9
-#define COFFIN_DUST_COUNT 6 // Patches per phase-two slam.
+#define COFFIN_DUST_COUNT 6 // Additional random arena patches per phase-two slam.
+#define COFFIN_SLAM_DUST_COUNT 24 // Dense patches around the impact point.
+#define COFFIN_SLAM_DUST_SPREAD 32.0f
 #define COFFIN_DUST_CAPACITY 64
 #define COFFIN_DASH_DUST_SPACING 12.0f
 #define COFFIN_DUST_LIFETIME 10.0f
@@ -69,8 +73,8 @@
 #define COFFIN_TRAIL_EFFECT_TIME 0.4f
 #define COFFIN_TRAIL_RADIUS 12.0f
 #define COFFIN_TRAIL_DAMAGE 28
-#define COFFIN_SLASH_REACH 48.0f
-#define COFFIN_SLASH_WIDTH 48.0f
+#define COFFIN_SLASH_REACH 64.0f
+#define COFFIN_SLASH_WIDTH 64.0f
 #define COFFIN_SLASH_TIME 1.4f
 #define COFFIN_SLASH_HIT_TIME 0.5f
 #define COFFIN_SLASH_PARRY_START 0.25f
@@ -84,7 +88,7 @@
 #define COFFIN_CHARGED_SLASH_TIME 1.2f
 #define COFFIN_CHARGED_HIT_TIME 0.8f
 #define COFFIN_CHARGED_DAMAGE 40
-#define COFFIN_CHARGED_REACH 96.0f
-#define COFFIN_CHARGED_WIDTH 64.0f
+#define COFFIN_CHARGED_REACH 120.0f
+#define COFFIN_CHARGED_WIDTH 80.0f
 #define COFFIN_STUN_TIME 3.5f
 #endif

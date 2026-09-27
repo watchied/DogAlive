@@ -4,7 +4,7 @@
 #include "src/ui/flesh_coffin_draw.h"
 static int shots(const FleshCoffin *c) { int n=0;for(int i=0;i<COFFIN_SHOT_CAPACITY;++i)n+=c->shots[i].active;return n; }
 static void tick(FleshCoffin *c,Player *p,float time) { for(float t=0;t<time;t+=0.01f) { p->invincibilityTimer=100;Coffin_Update(c,p,0.01f); } }
-static void combat(FleshCoffin *c,int phase) { Coffin_Init(c);c->phase=phase;Coffin_Enter(c,FC_IDLE); }
+static void combat(FleshCoffin *c,int phase) { Coffin_Init(c);c->rescueDone=true;c->phase=phase;Coffin_Enter(c,FC_IDLE); }
 int main(void) {
     Player p;Player_Init(&p);p.x=24;p.y=180;
     FleshCoffin c;Coffin_Init(&c);
@@ -119,7 +119,7 @@ int main(void) {
     SDL_FRect door=Stage_ExitBox(stage.index);
     p.x=door.x;p.y=door.y;Stage_Update(&stage,&p,&g,arrows,slime,&effect);
     assert(!stage.completed);
-    Coffin_Enter(&g.coffin,FC_IDLE);Coffin_DamageSwords(&g.coffin,COFFIN_SWORDS_HP);
+    g.coffin.rescueDone=true;Coffin_Enter(&g.coffin,FC_IDLE);Coffin_DamageSwords(&g.coffin,COFFIN_SWORDS_HP);
     Coffin_Damage(&g.coffin,COFFIN_HP);assert(Stage_EnemiesAlive(&g)==1);
     tick(&g.coffin,&p,COFFIN_DEATH_TIME+0.01f);
     Stage_Update(&stage,&p,&g,arrows,slime,&effect);
@@ -135,9 +135,13 @@ int main(void) {
     int patches=0;
     for(int i=0;i<COFFIN_DUST_CAPACITY;++i) if(c.dust[i].life>0) {
         ++patches;assert(c.dust[i].life==COFFIN_DUST_LIFETIME);
-        assert(c.dust[i].x>=COFFIN_DUST_MARGIN && c.dust[i].x<=GAME_WIDTH-COFFIN_DUST_MARGIN);
+        assert(c.dust[i].x>=COFFIN_DUST_RADIUS && c.dust[i].x<=GAME_WIDTH-COFFIN_DUST_RADIUS);
     }
-    assert(patches==COFFIN_DUST_COUNT);
+    assert(patches==COFFIN_DUST_COUNT+COFFIN_SLAM_DUST_COUNT);
+    int nearby=0;
+    for(int i=0;i<COFFIN_DUST_CAPACITY;++i)
+        if(c.dust[i].life>0 && hypotf(c.dust[i].x-Coffin_SlamX(&c),c.dust[i].y-Coffin_SlamY(&c))<=COFFIN_SLAM_DUST_SPREAD+0.01f) ++nearby;
+    assert(nearby>=COFFIN_SLAM_DUST_COUNT);
     memset(c.dust,0,sizeof(c.dust));c.dustContactTimer=0;p.invincibilityTimer=0;
     c.dust[0]=c.dust[1]=(CoffinDust){108,108,COFFIN_DUST_LIFETIME};
     hp=p.hp;Coffin_UpdateDust(&c,&p,COFFIN_DUST_TICK_TIME/2);assert(p.hp==hp);
@@ -249,6 +253,17 @@ int main(void) {
         assert(Coffin_Sprite(&c)==((side==1 || side==3)?flesh_coffin_phase2Attack_swordFront[0]:
             flesh_coffin_phase2Attack_swordBack[0]));
     }
+    combat(&g.coffin,1);
+    g.coffin.swords[0]=(CoffinSword){.x=90,.y=80,.active=true};
+    Coffin_DamageSwords(&g.coffin,COFFIN_SWORDS_HP);
+    assert(g.coffin.swordsDropped && g.coffin.fallenSwords[0].x==90);
+    assert(!g.coffin.swords[0].active);
+    EnemyTarget droppedTargets[ENEMY_TARGET_CAPACITY];
+    int droppedCount=EnemyGroup_Targets(&g,droppedTargets);
+    for(int i=0;i<droppedCount;++i) assert(droppedTargets[i].type!=5);
+    p.hp=p.maxHP;Coffin_Update(&g.coffin,&p,COFFIN_SWORD_DROP_TIME);
+    assert(g.coffin.swordDropTimer==COFFIN_SWORD_DROP_TIME);
+    Coffin_ClearAttacks(&g.coffin);assert(g.coffin.swordsDropped);
     puts("Flesh Coffin dust DoT, fall sprites, skills, phases, parry, phase 1 walking and route passed");
     return 0;
 }

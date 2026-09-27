@@ -1,3 +1,5 @@
+#include "src/audio/boss_music.h"
+#include "src/audio/ending_music.h"
 #include <SDL3/SDL.h>
 #include <stdbool.h>
 #include "src/core/game_core.h"
@@ -18,6 +20,7 @@
 #include "src/ui/flesh_coffin_draw.h"
 #include "src/effects/parry_effect.h"
 #include "src/ui/room_objects_draw.h"
+#include "src/story/story.h"
 
 typedef enum {
     GAME_MENU,      // หน้าก่อนเริ่มเกม
@@ -246,6 +249,16 @@ int main(void)
     SlimeShot slimeShots[SLIME_SHOT_CAPACITY] = {0};
     Reset_Game(&stage, &player, &enemies, projectiles, slimeShots, &runningEffect);
     GameState gameState = GAME_MENU;
+    BossMusic bossMusic={0};
+    EndingMusic endingMusic={0};
+    Story story={0};
+    StoryArt storyArt={0};
+    if(!StoryArt_Init(&storyArt,renderer)) {
+        SDL_Log("Unable to load story backgrounds: %s",SDL_GetError());
+        StoryArt_Close(&storyArt);SDL_DestroyTexture(floorAtlas);
+        for(int i=0;i<3;++i) SDL_DestroyTexture(arrowTexture[i]);
+        SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 1;
+    }
 
     bool running = true;
     uint64_t lastTime = SDL_GetTicks();
@@ -279,7 +292,7 @@ int main(void)
             if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat)
             {
                 SDL_Scancode key = event.key.scancode;
-                if(gameState==GAME_PLAYING && player.hp>0 && key>=SDL_SCANCODE_1 && key<=SDL_SCANCODE_0) {
+                if(gameState==GAME_PLAYING && story.mode==STORY_NORMAL && !story.helper && player.hp>0 && key>=SDL_SCANCODE_1 && key<=SDL_SCANCODE_0) {
                     int target=key==SDL_SCANCODE_0?9:key-SDL_SCANCODE_1;
                     stage.saved[stage.index]=enemies;stage.visited[stage.index]=true;
                     stage.index=target;stage.completed=false;
@@ -287,15 +300,17 @@ int main(void)
                     if(stage.visited[target]) enemies=stage.saved[target];
                     bowInput=(BowInput){0};shootRequested=false;deltaTime=0;
                 }
-                if (gameState == GAME_PLAYING && player.hp > 0 && key == SDL_SCANCODE_J)
+                if (gameState == GAME_PLAYING && story.mode==STORY_NORMAL && player.hp > 0 && key == SDL_SCANCODE_J)
                     BowInput_Press(&bowInput, event.key.timestamp ? event.key.timestamp / 1000000 : SDL_GetTicks());
                 if (gameState == GAME_OVER && key == SDL_SCANCODE_RETURN) {
+                    story=(Story){0};
                     Stage_Respawn(&stage, &player, &enemies, projectiles, slimeShots, &runningEffect);
                     player.attackWasDown = SDL_GetKeyboardState(NULL)[SDL_SCANCODE_SPACE];
                     bowInput = (BowInput){0}; shootRequested = false;
                     gameState = GAME_PLAYING; deltaTime = 0;
                 } else if ((gameState == GAME_MENU && key == SDL_SCANCODE_RETURN) ||
                     (gameState != GAME_MENU && key == SDL_SCANCODE_R)) {
+                    story=(Story){0};
                     Reset_Game(&stage, &player, &enemies, projectiles, slimeShots, &runningEffect);
                     bowInput = (BowInput){0}; shootRequested = false;
                     gameState = GAME_PLAYING;
@@ -316,12 +331,20 @@ int main(void)
         }
 
         const bool *keyboardState = SDL_GetKeyboardState(NULL);
-        if (gameState != GAME_PLAYING || player.hp <= 0 || !(SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS)) {
+        if (gameState != GAME_PLAYING || story.mode!=STORY_NORMAL || player.hp <= 0 || !(SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS)) {
             bowInput = (BowInput){0}; shootRequested = false;
         } else BowInput_Update(&bowInput, &player, SDL_GetTicks());
 
+        if(gameState==GAME_PLAYING) {
+            Story_Update(&story,&stage,&player,&enemies,keyboardState,deltaTime);
+            if(Story_Locked(&story)) {
+                shootRequested=false;bowInput=(BowInput){0};
+                Projectiles_Reset(projectiles);memset(slimeShots,0,sizeof(slimeShots));
+                player.parryEffectTimer=fmaxf(0,player.parryEffectTimer-deltaTime*Story_TimeScale(&story));
+            }
+        }
         // Freeze all simulation timers and actors while a menu is open.
-        if (gameState == GAME_PLAYING) {
+        if (gameState == GAME_PLAYING && !Story_Locked(&story)) {
             player.collisionGraceTimer = fmaxf(0.0f, player.collisionGraceTimer - deltaTime);
             player.invincibilityTimer = fmaxf(0.0f, player.invincibilityTimer - deltaTime);
             player.hitFlashTimer = fmaxf(0.0f, player.hitFlashTimer - deltaTime);
@@ -332,7 +355,14 @@ int main(void)
                 if (keyboardState[SDL_SCANCODE_SPACE] && !player.attackWasDown && Room_Interact(&stage, &player))
                     player.attackWasDown = true; // Consume this press; holding Space cannot also slash.
                 float oldX = player.x, oldY = player.y;
-                Game_Update(&player, keyboardState, deltaTime);
+                bool walkKeys[SDL_SCANCODE_COUNT];
+                const bool *movementKeys=keyboardState;
+                if(story.mode==STORY_RETURN) {
+                    memcpy(walkKeys,keyboardState,sizeof(walkKeys));
+                    walkKeys[SDL_SCANCODE_SPACE]=false;movementKeys=walkKeys;
+                }
+                Game_Update(&player, movementKeys, deltaTime);
+                if(stage.index==STAGE_ENTRANCE_ROOM) Entrance_Clamp(&player);
                 Player_UpdatePotion(&player, deltaTime);
                 Room_BlockMovement(&roomDefinitions[stage.index], &player, oldX, oldY);
                 Stage_ClampPlayer(&player);
@@ -348,7 +378,13 @@ int main(void)
                     else Projectiles_Shoot(projectiles, &player);
                 }
             }
-            EnemyGroup_Update(&enemies, &player, slimeShots, deltaTime);
+            if(story.mode!=STORY_RETURN && !enemies.coffin.rescueRequested)
+                EnemyGroup_Update(&enemies, &player, slimeShots, deltaTime);
+            if(enemies.coffin.active && enemies.coffin.state==FC_DEAD && story.mode==STORY_NORMAL) {
+                story.helper=true;Story_Enter(&story,STORY_RETURN);
+                stage.returningHome=true;stage.completed=false;player.walkOnly=true;
+                Projectiles_Reset(projectiles);memset(slimeShots,0,sizeof(slimeShots));
+            }
             if (player.hp == 0)
             {
                 Projectiles_Reset(projectiles);
@@ -362,12 +398,21 @@ int main(void)
                 Update_PlayerDeath(&player, deltaTime);
             }
             RunningEffect_Update(&runningEffect, &player, deltaTime);
+            Story_DogCollision(&story,&stage,&player,&enemies);
             int previousStage = stage.index;
             Stage_Update(&stage, &player, &enemies, projectiles, slimeShots, &runningEffect);
             if (stage.index != previousStage) bowInput = (BowInput){0};
-            if (stage.completed) gameState = GAME_VICTORY;
+            if (stage.completed && story.mode!=STORY_RETURN) gameState = GAME_VICTORY;
             if (player.deathFinished) gameState = GAME_OVER;
         }
+        bool coffinEncounter=(gameState==GAME_PLAYING || gameState==GAME_PAUSED) &&
+            stage.index==STAGE_COFFIN_ROOM && player.hp>0 && enemies.coffin.active &&
+            enemies.coffin.state!=FC_DORMANT && enemies.coffin.state!=FC_DEATH && enemies.coffin.state!=FC_DEAD;
+        BossMusic_Update(&bossMusic,coffinEncounter,gameState==GAME_PAUSED);
+        if(story.endingRestart) { EndingMusic_Update(&endingMusic,false,false);story.endingRestart=false; }
+        bool endingPlaying=(story.mode==STORY_SLIDES || story.mode==STORY_WHITE) &&
+            (gameState==GAME_PLAYING || gameState==GAME_PAUSED);
+        EndingMusic_Update(&endingMusic,endingPlaying,gameState==GAME_PAUSED);
         SDL_SetWindowTitle(window, gameState == GAME_MENU ? "Dog Alive | Enter: Start" :
             gameState == GAME_PAUSED ? "Paused | Esc: Resume | R: Restart | M: Main menu" :
             gameState == GAME_VICTORY ? "Dungeon cleared | R: Restart | M: Main menu" :
@@ -377,8 +422,12 @@ int main(void)
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
 
-        if (gameState != GAME_MENU) {
-            Stage_Draw(renderer, floorAtlas, &stage, &enemies);
+        if (gameState != GAME_MENU && story.mode<STORY_DEATH) {
+            if(stage.index==STAGE_ENTRANCE_ROOM) {
+                Story_Background(renderer,&storyArt,story.mode==STORY_EXIT_WALK?0:1,1,0);
+                SDL_SetRenderDrawColor(renderer,255,255,255,255);
+                SDL_RenderDebugText(renderer,96,224,"Enter the cave");
+            } else Stage_Draw(renderer, floorAtlas, &stage, &enemies);
             Coffin_DrawGround(renderer,&enemies.coffin);
             for(int i=0;i<COFFIN_DUST_CAPACITY;++i) if(enemies.slimeDust.dust[i].life>0)
                 King_DrawPixels(renderer,enemies.slimeDust.dust[i].x,enemies.slimeDust.dust[i].y,
@@ -535,7 +584,11 @@ int main(void)
                 MeleeSlash_Ghoul(renderer, &enemies.ghouls[i]);
             Draw_ArrowEffects(renderer, &enemies);
 
-            HUD_Draw(renderer, &player);
+            if(story.mode!=STORY_RESCUE && story.mode!=STORY_EXIT_WALK) HUD_Draw(renderer, &player);
+        }
+        if(gameState!=GAME_MENU) {
+            Story_Draw(&story,&storyArt,renderer,&player);
+            if(story.mode==STORY_RESCUE) ParryEffect_Draw(renderer,&player);
         }
         Draw_GameUI(renderer, gameState);
 
@@ -543,6 +596,9 @@ int main(void)
         SDL_Delay(16);
     }
 
+    BossMusic_Close(&bossMusic);
+    EndingMusic_Close(&endingMusic);
+    StoryArt_Close(&storyArt);
     SDL_DestroyTexture(floorAtlas);
     for (int i = 0; i < 3; ++i) SDL_DestroyTexture(arrowTexture[i]);
     SDL_DestroyRenderer(renderer);

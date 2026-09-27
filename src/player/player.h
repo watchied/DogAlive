@@ -14,7 +14,7 @@
 #define PLAYER_START_EXPLOSIVE_ARROW 0
 #define PLAYER_START_ENCHANT_BLADE 1
 #define PLAYER_DEFAULT_SPEED 40.0f
-#define PLAYER_MAX_HP 100
+#define PLAYER_MAX_HP 10000
 #define PLAYER_HITBOX_SIZE 13.0f
 #define PLAYER_HITBOX_OFFSET ((ACTOR_SIZE - PLAYER_HITBOX_SIZE) / 2.0f)
 #define PLAYER_START_POTIONS 2
@@ -32,7 +32,7 @@
 #define PLAYER_STAMINA_REGEN 30.0f
 #define PLAYER_SPRINT_MIN_STAMINA 20.0f
 #define PLAYER_DOUBLE_TAP_TIME 0.25f
-#define PLAYER_ATTACK_DAMAGE 30
+#define PLAYER_ATTACK_DAMAGE 3000
 #define PLAYER_MELEE_STAMINA_COST 15.0f // Stamina spent once when starting a slash.
 #define PLAYER_CHARGE_TIME 1.5f
 #define PLAYER_CHARGE_REACH 64.0f // Forward distance from the player's center.
@@ -40,7 +40,7 @@
 #define PLAYER_CHARGE_MOVE_MULTIPLIER 0.7f
 #define PLAYER_CHARGE_DAMAGE_MULTIPLIER 2.0f
 #define PLAYER_CHARGE_STAMINA_COST 15.0f
-#define PLAYER_PARRY_START_TIME 0.2f
+#define PLAYER_PARRY_START_TIME 0.25f
 #define PLAYER_PARRY_END_TIME 0.6f
 #define PLAYER_PARRY_FLASH_TIME 0.16f
 #define PLAYER_PARRY_EFFECT_TIME 0.6f
@@ -91,6 +91,7 @@ typedef struct
     float stamina;
     float maxStamina;
     bool isSprinting;
+    bool walkOnly;
     unsigned int moveWasDown;
     unsigned int sprintButton;
     float tapRemaining[4];

@@ -5,6 +5,11 @@
 #include "assets/sprites/map/map_ground.h"
 
 #define FLOOR_PLAIN_PERCENT 60
+// Night tint for dirt/grass floors only. 255 = original brightness per channel.
+#define FLOOR_NIGHT_ENABLED 1
+#define FLOOR_NIGHT_RED 85
+#define FLOOR_NIGHT_GREEN 110
+#define FLOOR_NIGHT_BLUE 170
 #define FLOOR_ATLAS_COUNT (MAP_OBJECT_FLOOR_COUNT+MAP_OBJECT_DIRT_COUNT+MAP_OBJECT_GLASS_COUNT)
 static inline const uint16_t *Floor_Pixels(int i) {
     if(i<MAP_OBJECT_FLOOR_COUNT) return map_object_floor[i];

@@ -1,0 +1,10 @@
+prepared/
+build-project/
+host-check/
+ide-workspace/
+ide-config/
+target-workspace/
+target-build.log
+sd-card/
+tools/vendor/
+__pycache__/

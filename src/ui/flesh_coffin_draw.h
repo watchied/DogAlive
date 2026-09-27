@@ -95,6 +95,15 @@ static inline const uint16_t *Coffin_Sprite(const FleshCoffin *c) {
 }
 static inline void Coffin_DrawGround(SDL_Renderer *r,const FleshCoffin *c) {
     if(!c->active) return;
+    if(c->swordsDropped) {
+        float t=fminf(1,c->swordDropTimer/fmaxf(0.001f,COFFIN_SWORD_DROP_TIME));
+        for(int i=0;i<3;++i) {
+            const CoffinFallenSword *s=&c->fallenSwords[i];
+            float y=fminf(GAME_HEIGHT-10,s->y+COFFIN_SWORD_DROP_DISTANCE*t*t);
+            King_DrawPixels(r,s->x,y,blood_spellblade_frames[0],
+                BLOOD_SPELLBLADE_WIDTH,BLOOD_SPELLBLADE_HEIGHT,s->angle*t,false);
+        }
+    }
     if(c->phase==2) {
         SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(r,235,30,45,85);
