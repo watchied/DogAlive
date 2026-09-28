@@ -7,6 +7,7 @@
 #include "assets/sprites/player/knigh(daughter).h"
 #include "assets/sprites/player/player_sprites.h"
 #include "assets/sprites/cutcene/dungeon entrance.h"
+#include "assets/sprites/cutcene/space.h"
 typedef enum {
     STORY_NORMAL,STORY_RESCUE,STORY_RETURN,STORY_EXIT_WALK,STORY_DEATH,STORY_DOG_APPROACH,
     STORY_FADE,STORY_SLIDES,STORY_EPILOGUE,STORY_SKY,STORY_WHITE
@@ -19,7 +20,7 @@ typedef struct {
     bool helper,dogMoving,dogHit,spaceDown,knightMoving,endingRestart;
     bool dogFacingLeft,knightFacingLeft;
 } Story;
-typedef struct { SDL_Texture *frames[DUNGEON_ENTRANCE_FRAMES_COUNT]; } StoryArt;
+typedef struct { SDL_Texture *frames[DUNGEON_ENTRANCE_FRAMES_COUNT]; SDL_Texture *space; } StoryArt;
 static inline int Story_Frame(float t,const uint32_t *times,int count) {
     for(int i=0;i<count;++i) { t-=times[i]/1000.0f;if(t<0) return i; }
     return count-1;
@@ -180,23 +181,36 @@ static inline void Story_Update(Story *s,StageProgress *stage,Player *p,EnemyGro
     }
     s->lastRoom=stage->index;
 }
-static inline bool StoryArt_Init(StoryArt *art,SDL_Renderer *r) {
-    for(int i=0;i<DUNGEON_ENTRANCE_FRAMES_COUNT;++i) {
-        SDL_Surface *surface=SDL_CreateSurface(320,240,SDL_PIXELFORMAT_RGBA32);
-        if(!surface) return false;
-        for(int y=0;y<240;++y) for(int x=0;x<320;++x) {
-            uint16_t c=dungeon_entrance_frames[i][y*320+x];
-            Uint8 *pixel=(Uint8*)surface->pixels+y*surface->pitch+x*4;
-            pixel[0]=((c>>11)&31)*255/31;pixel[1]=((c>>5)&63)*255/63;pixel[2]=(c&31)*255/31;pixel[3]=255;
-        }
-        art->frames[i]=SDL_CreateTextureFromSurface(r,surface);SDL_DestroySurface(surface);
-        if(!art->frames[i]) return false;
-        SDL_SetTextureScaleMode(art->frames[i],SDL_SCALEMODE_NEAREST);
-        SDL_SetTextureBlendMode(art->frames[i],SDL_BLENDMODE_BLEND);
+static inline SDL_Texture *StoryArt_Texture(SDL_Renderer *r,const uint16_t *pixels,int width,int height) {
+    SDL_Surface *surface=SDL_CreateSurface(width,height,SDL_PIXELFORMAT_RGBA32);
+    if(!surface) return NULL;
+    for(int y=0;y<height;++y) for(int x=0;x<width;++x) {
+        uint16_t c=pixels[y*width+x];
+        Uint8 *pixel=(Uint8*)surface->pixels+y*surface->pitch+x*4;
+        pixel[0]=((c>>11)&31)*255/31;pixel[1]=((c>>5)&63)*255/63;pixel[2]=(c&31)*255/31;pixel[3]=255;
     }
+    SDL_Texture *texture=SDL_CreateTextureFromSurface(r,surface);SDL_DestroySurface(surface);
+    if(texture) {
+        SDL_SetTextureScaleMode(texture,SDL_SCALEMODE_NEAREST);
+        SDL_SetTextureBlendMode(texture,SDL_BLENDMODE_BLEND);
+    }
+    return texture;
+}
+static inline void StoryArt_Close(StoryArt *a) {
+    for(int i=0;i<DUNGEON_ENTRANCE_FRAMES_COUNT;++i) SDL_DestroyTexture(a->frames[i]);
+    SDL_DestroyTexture(a->space);
+    *a=(StoryArt){0};
+}
+static inline bool StoryArt_Init(StoryArt *art,SDL_Renderer *r) {
+    *art=(StoryArt){0};
+    for(int i=0;i<DUNGEON_ENTRANCE_FRAMES_COUNT;++i) {
+        art->frames[i]=StoryArt_Texture(r,dungeon_entrance_frames[i],320,240);
+        if(!art->frames[i]) { StoryArt_Close(art);return false; }
+    }
+    art->space=StoryArt_Texture(r,space_frames[0],SPACE_WIDTH,SPACE_HEIGHT);
+    if(!art->space) { StoryArt_Close(art);return false; }
     return true;
 }
-static inline void StoryArt_Close(StoryArt *a) { for(int i=0;i<10;++i) SDL_DestroyTexture(a->frames[i]); }
 static inline void Story_Background(SDL_Renderer *r,StoryArt *a,int frame,float alpha,float y) {
     SDL_SetTextureAlphaMod(a->frames[frame],(Uint8)(255*fmaxf(0,fminf(1,alpha))));
     SDL_FRect dst={0,y,320,240};SDL_RenderTexture(r,a->frames[frame],NULL,&dst);
@@ -225,11 +239,14 @@ static inline void Story_Draw(Story *s,StoryArt *art,SDL_Renderer *r,const Playe
         if(s->mode>=STORY_EPILOGUE) {
             float pan=s->mode==STORY_SKY?fminf(1,s->timer/EPILOGUE_PAN_TIME):s->mode==STORY_WHITE?1:0;
             pan=pan*pan*(3-2*pan);
-            SDL_SetRenderDrawColor(r,20,47,102,255);SDL_FRect sky={0,0,320,240};SDL_RenderFillRect(r,&sky);
-            Story_Background(r,art,7+s->interaction,1,pan*190);
+            // Stack the sky directly above the entrance and move both with the camera.
+            float offset=pan*GAME_HEIGHT;
+            SDL_FRect sky={0,offset-GAME_HEIGHT,GAME_WIDTH,GAME_HEIGHT};
+            SDL_RenderTexture(r,art->space,NULL,&sky);
+            Story_Background(r,art,7+s->interaction,1,offset);
             if(s->mode==STORY_EPILOGUE || s->mode==STORY_SKY) {
                 const uint16_t *knight=s->interactTimer>0?knight_interact[0]:s->knightMoving?knight_walk[(int)(s->knightAnim/0.12f)%KNIGHT_WALK_COUNT]:knight_idle[0];
-                Story_DrawCharacter(r,s->knightX+8,s->knightY+8+pan*190,knight,s->knightFacingLeft);
+                Story_DrawCharacter(r,s->knightX+8,s->knightY+8+offset,knight,s->knightFacingLeft);
                 SDL_SetRenderDrawColor(r,255,255,255,255);
                 if(s->mode==STORY_EPILOGUE) SDL_RenderDebugText(r,10,224,s->interaction==0?"Space: Talk to Dog":s->interaction==1?"Space: Visit grave":"Rest a moment...");
             }
