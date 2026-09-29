@@ -83,6 +83,7 @@ typedef struct
     float hitFlashTimer;
     bool chargedParryEffect;
     float parryEffectTimer, parryEffectX, parryEffectY;
+    bool parrySoundPending;
     float collisionGraceTimer;
     float invincibilityTimer;
     int maxHP;

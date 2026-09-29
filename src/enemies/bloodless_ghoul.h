@@ -110,6 +110,7 @@ static inline bool Ghoul_TryParry(Ghoul *g, Player *p)
     g->parriedSwingId = p->meleeSwingId;
     p->hitFlashTimer = g->hitFlashTimer = PLAYER_PARRY_FLASH_TIME;
     Player_ShowParry(p,g->x+ACTOR_HALF_SIZE,g->y+ACTOR_HALF_SIZE);
+    p->parrySoundPending = true;
     return true;
 }
 

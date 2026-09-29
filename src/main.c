@@ -1,5 +1,6 @@
 #include "src/audio/boss_music.h"
 #include "src/audio/ending_music.h"
+#include "src/audio/slash_sfx.h"
 #include <SDL3/SDL.h>
 #include <stdbool.h>
 #include "src/core/game_core.h"
@@ -21,6 +22,7 @@
 #include "src/effects/parry_effect.h"
 #include "src/ui/room_objects_draw.h"
 #include "src/story/story.h"
+#include "src/audio/game_sfx_events.h"
 
 typedef enum {
     GAME_MENU,      // หน้าก่อนเริ่มเกม
@@ -251,6 +253,8 @@ int main(void)
     GameState gameState = GAME_MENU;
     BossMusic bossMusic={0};
     EndingMusic endingMusic={0};
+    SlashSfx slashSfx={0};
+    GameSfxSystem gameSfx={0};
     Story story={0};
     StoryArt storyArt={0};
     if(!StoryArt_Init(&storyArt,renderer)) {
@@ -259,6 +263,9 @@ int main(void)
         for(int i=0;i<3;++i) SDL_DestroyTexture(arrowTexture[i]);
         SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 1;
     }
+    if (!SlashSfx_Init(&slashSfx)) SDL_Log("Slash sound unavailable: %s", SDL_GetError());
+    if (!GameSfx_Init(&gameSfx.audio, slashSfx.device))
+        SDL_Log("Game effects unavailable: %s", SDL_GetError());
 
     bool running = true;
     uint64_t lastTime = SDL_GetTicks();
@@ -413,6 +420,10 @@ int main(void)
         bool endingPlaying=(story.mode==STORY_SLIDES || story.mode==STORY_WHITE) &&
             (gameState==GAME_PLAYING || gameState==GAME_PAUSED);
         EndingMusic_Update(&endingMusic,endingPlaying,gameState==GAME_PAUSED);
+        GameSfxSnapshot soundState=GameSfx_Capture(gameState,&stage,&story,&player,
+                                                   &enemies,projectiles,slimeShots);
+        GameSfx_Observe(&gameSfx,&soundState,deltaTime);
+        SlashSfx_Update(&slashSfx, &player, gameState==GAME_PLAYING && !Story_Locked(&story));
         SDL_SetWindowTitle(window, gameState == GAME_MENU ? "Dog Alive | Enter: Start" :
             gameState == GAME_PAUSED ? "Paused | Esc: Resume | R: Restart | M: Main menu" :
             gameState == GAME_VICTORY ? "Dungeon cleared | R: Restart | M: Main menu" :
@@ -598,6 +609,8 @@ int main(void)
 
     BossMusic_Close(&bossMusic);
     EndingMusic_Close(&endingMusic);
+    GameSfx_Close(&gameSfx.audio);
+    SlashSfx_Close(&slashSfx);
     StoryArt_Close(&storyArt);
     SDL_DestroyTexture(floorAtlas);
     for (int i = 0; i < 3; ++i) SDL_DestroyTexture(arrowTexture[i]);

@@ -118,6 +118,7 @@ static inline bool Coffin_Parry(FleshCoffin *c, Player *p) {
     c->hit = true; c->parried = true; c->parriedSwing = p->meleeSwingId;
     c->flash = p->hitFlashTimer = PLAYER_PARRY_FLASH_TIME;
     Player_ShowParry(p,c->x,c->y);
+    p->parrySoundPending = true;
     return true;
 }
 static inline void Coffin_Spawn(FleshCoffin *c, float x, float y, float ux, float uy, bool reflectable) {

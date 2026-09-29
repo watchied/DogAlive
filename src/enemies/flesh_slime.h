@@ -15,6 +15,10 @@
 #define SLIME_SHOT_CAPACITY (16 * ENEMY_TYPE_CAPACITY)
 #define SLIME_PROJECTILE_SPEED 50.0f // World pixels per second.
 #define FLESH_SLIME_PREFERRED_DISTANCE 100.0f
+// Ordinary slime: retreat only up close, circle within this band, approach beyond it.
+#define SLIME_RETREAT_DISTANCE 48.0f
+#define SLIME_APPROACH_DISTANCE 72.0f
+#define SLIME_STRAFE_SPEED_SCALE 0.65f
 
 typedef struct {
     float x, y, vx, vy, lifetime;
@@ -41,6 +45,7 @@ typedef struct
     bool deathFinished;
     bool ordinarySlime;
     float dustDistance;
+    float strafeDirection;
     int frame;
     int attackDamage;
     int hp;
@@ -56,6 +61,7 @@ static inline void FleshSlime_Init(FleshSlime *f, float x, float y)
         .x = x,
         .y = y,
         .speed = 65.0f / 3.0f,
+        .strafeDirection = ((int)(x+y)&1)?1.0f:-1.0f,
         .direction = PLAYER_LEFT,
         .state = FLEASH_SLIME_WALK,
         .attackDamage = 20,
@@ -137,7 +143,22 @@ static inline void FleshSlime_Update(FleshSlime *f, Player *p, SlimeShot *shots,
         return;
     }
     // Reposition between shots, even when the player is outside melee range.
-    if (distance > 0.001f && fabsf(distance - FLESH_SLIME_PREFERRED_DISTANCE) > 5) {
+    if (f->ordinarySlime && distance > 0.001f) {
+        float ux=dx/distance,uy=dy/distance;
+        float radial=distance<SLIME_RETREAT_DISTANCE?-1.0f:
+            distance>SLIME_APPROACH_DISTANCE?1.0f:0.0f;
+        float step=f->speed*dt;
+        if(radial!=0) step=fminf(step,radial<0?SLIME_RETREAT_DISTANCE-distance:distance-SLIME_APPROACH_DISTANCE);
+        // Rotate around the player without gradually drifting away from the firing range.
+        float radius=distance-radial*step;
+        float angle=f->strafeDirection*f->speed*SLIME_STRAFE_SPEED_SCALE*dt/fmaxf(radius,1.0f);
+        float nx=p->x-radius*(ux*cosf(angle)-uy*sinf(angle));
+        float ny=p->y-radius*(ux*sinf(angle)+uy*cosf(angle));
+        if(nx<0 || nx>GAME_WIDTH-ACTOR_SIZE || ny<0 || ny>GAME_HEIGHT-ACTOR_SIZE)
+            f->strafeDirection=-f->strafeDirection;
+        f->x=fmaxf(0,fminf(GAME_WIDTH-ACTOR_SIZE,nx));
+        f->y=fmaxf(0,fminf(GAME_HEIGHT-ACTOR_SIZE,ny));
+    } else if (!f->ordinarySlime && distance > 0.001f && fabsf(distance - FLESH_SLIME_PREFERRED_DISTANCE) > 5) {
         float sign = distance > FLESH_SLIME_PREFERRED_DISTANCE ? 1.0f : -1.0f;
         float step = fminf(f->speed * dt, fabsf(distance - FLESH_SLIME_PREFERRED_DISTANCE));
         f->x = fmaxf(0, fminf(GAME_WIDTH - ACTOR_SIZE, f->x + dx / distance * step * sign));
